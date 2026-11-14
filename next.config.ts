@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The site root is the admin entrance (login when signed out); registrants use each event's /e/<link>.
+  redirects: async () => [{ source: "/", destination: "/admin", permanent: false }],
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
