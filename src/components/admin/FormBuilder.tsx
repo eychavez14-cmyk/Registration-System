@@ -27,6 +27,7 @@ export function FieldsEditor({ fields, onChange }: { fields: Field[]; onChange: 
                 </select>
               </label>
             </div>
+            <Text label="Description (optional, shown under the question)" value={f.description ?? ""} onChange={(description) => setField({ description })} />
             {f.type !== "checkbox" && !hasOptions && <Text label="Placeholder" value={f.placeholder ?? ""} onChange={(placeholder) => setField({ placeholder })} />}
             {hasOptions && (
               <Text label="Options (one per line)" textarea value={(f.options ?? []).join("\n")}
@@ -70,6 +71,7 @@ export function FormBuilder({ config, onChange, hasRegistrations }: { config: Ev
           }
         >
           <Text label="Section title" value={s.title} onChange={(title) => setSection(si, { ...s, title })} />
+          <Text label="Section description (optional)" textarea value={s.description ?? ""} onChange={(description) => setSection(si, { ...s, description })} />
           <FieldsEditor fields={s.fields} onChange={(fields) => setSection(si, { ...s, fields })} />
         </Panel>
       ))}

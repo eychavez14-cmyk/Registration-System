@@ -29,12 +29,13 @@ export function EventShell({ event, tab, children, intro }: { event: Pick<EventR
     </>
   );
   // Banner (image, GIF or muted looping video) plus the colour overlay; used by the header and the intro cover.
+  const bannerPos = `${theme.bannerPosX}% ${theme.bannerPosY}%`; // admin-chosen focal point
   const bannerLayers = theme.bannerUrl ? (
     <>
       {isVideo(theme.bannerUrl) ? (
-        <video src={theme.bannerUrl} autoPlay muted loop playsInline aria-hidden className="absolute inset-0 h-full w-full object-cover" />
+        <video src={theme.bannerUrl} autoPlay muted loop playsInline aria-hidden className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: bannerPos }} />
       ) : (
-        <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${theme.bannerUrl}")` }} />
+        <div aria-hidden className="absolute inset-0 bg-cover" style={{ backgroundImage: `url("${theme.bannerUrl}")`, backgroundPosition: bannerPos }} />
       )}
       <div aria-hidden className="absolute inset-0" style={{ backgroundColor: theme.overlayColor, opacity: theme.overlayOpacity / 100 }} />
     </>
@@ -66,7 +67,7 @@ export function EventShell({ event, tab, children, intro }: { event: Pick<EventR
         </div>
       </nav>
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 sm:py-8">{children}</main>
-      <footer className="print:hidden border-t border-slate-200 bg-white px-4 py-3 text-center text-xs text-slate-400 whitespace-pre-line">{footer}</footer>
+      <footer className="print:hidden border-t border-slate-200 px-4 py-3 text-center text-xs whitespace-pre-line" style={{ backgroundColor: theme.footerBg, color: theme.footerText }}>{footer}</footer>
     </div>
   );
 }

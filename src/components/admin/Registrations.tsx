@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EventRow, Registration, Status } from "@/lib/types";
-import { browserDb } from "@/lib/supabase/browser";
+import { authFetch, browserDb } from "@/lib/supabase/browser";
+import { diffChange } from "@/lib/edit";
 import { money } from "@/lib/validate";
 import { STATUS_STYLE } from "@/components/StatusLookup";
 import { registrantEmail } from "@/lib/email";
 import { useRole } from "./AdminGate";
+import Link from "next/link";
+import { buildLines, choiceFields, choiceKey, filterLines, groupLines, registrantName, sumAmount } from "@/lib/report";
 import { btn, ConfirmButton, input } from "./ui";
 
 const PAGE = 1000; // Supabase returns at most 1000 rows per request
@@ -23,94 +26,70 @@ export async function loadAll(eventId: string) {
 
 const display = (v: unknown) => (typeof v === "boolean" ? (v ? "Yes" : "No") : v == null || v === "" ? "—" : String(v));
 
-function downloadCsv(rows: unknown[][], filename: string) {
-  const csv = "﻿" + rows.map((l) => l.map(csvCell).join(",")).join("\r\n"); // BOM so Excel reads ₱ and accents
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 // Check-in progress, e.g. "2/3" people (registrations without a delegate list count as 1).
 const checkinCount = (r: Registration) => Object.keys(r.checkin ?? {}).length;
 const checkinText = (r: Registration) => (checkinCount(r) ? `${checkinCount(r)}/${Math.max(1, r.attendees?.length ?? 0)}` : "");
 
-const csvCell = (v: unknown) => {
-  const s = v == null ? "" : typeof v === "boolean" ? (v ? "Yes" : "No") : String(v);
-  // Leading = + - @ would run as a formula in Excel.
-  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
-  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-};
-
 export function Registrations({ event }: { event: EventRow }) {
   const { config } = event;
-  const fields = config.sections.flatMap((s) => s.fields);
   const [rows, setRows] = useState<Registration[] | null>(null);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<"" | Status>("");
+  const [status, setStatus] = useState<"" | Status | "edit">("");
+  const [filters, setFilters] = useState<Record<string, string>>({}); // dropdown question filters
   const [open, setOpen] = useState<Registration | null>(null);
 
   const reload = () => loadAll(event.id).then(setRows, (e) => setError(e.message));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { reload(); }, [event.id]);
 
-  const nameOf = (r: Registration) => {
-    const a = r.answers;
-    const n = [a.first_name, a.last_name].filter((x) => typeof x === "string" && x).join(" ");
-    return n || String(fields.map((f) => a[f.id]).find((v) => typeof v === "string" && v) ?? "—");
-  };
+  const choices = useMemo(() => choiceFields(config), [config]);
+  // Statistics and the table both come from the filtered "lines" (one per person), so they always match.
+  const lines = useMemo(() => filterLines(buildLines(config, rows ?? []), config, filters), [config, rows, filters]);
 
   const filtered = useMemo(() => {
+    const ids = new Set(lines.map((l) => l.reg.id));
     const needle = q.trim().toLowerCase();
     const text = (r: Registration) => [r.ref_code, ...Object.values(r.answers), ...(r.attendees ?? []).flatMap((a) => Object.values(a.answers))].join(" ").toLowerCase();
-    return (rows ?? []).filter((r) => (!status || r.status === status) && (!needle || text(r).includes(needle)));
-  }, [rows, q, status]);
+    return (rows ?? []).filter((r) => ids.has(r.id) && (!status || (status === "edit" ? !!r.pending_change : r.status === status)) && (!needle || text(r).includes(needle)));
+  }, [rows, lines, q, status]);
 
   const stats = useMemo(() => {
-    const all = rows ?? [];
-    const active = all.filter((r) => r.status !== "rejected");
+    const regs = new Map(lines.map((l) => [l.reg.id, l.reg]));
+    const active = lines.filter((l) => l.reg.status !== "rejected");
     return {
-      count: all.length,
-      by: (s: Status) => all.filter((r) => r.status === s).length,
-      expected: active.reduce((s, r) => s + Number(r.total), 0),
-      confirmed: all.filter((r) => r.status === "confirmed").reduce((s, r) => s + Number(r.total), 0),
-      items: config.fees.items.map((i) => ({ ...i, qty: active.reduce((s, r) => s + (r.fees[i.id] ?? 0), 0) })),
+      count: regs.size,
+      by: (s: Status) => [...regs.values()].filter((r) => r.status === s).length,
+      expected: sumAmount(active),
+      confirmed: sumAmount(lines, "confirmed"),
+      groups: groupLines(active, config, "category"),
+      edits: (rows ?? []).filter((r) => r.pending_change).length,
     };
-  }, [rows, config.fees.items]);
-
-  function exportCsv() {
-    const head = ["Reference", "Submitted", "Status", ...fields.map((f) => f.label), ...(config.fees.enabled ? config.fees.items.map((i) => i.label) : []), "Total", "Receipt", "Checked in", "Admin note"];
-    const lines = filtered.map((r) => [
-      r.ref_code, new Date(r.created_at).toLocaleString(), r.status,
-      ...fields.map((f) => r.answers[f.id]),
-      ...(config.fees.enabled ? config.fees.items.map((i) => r.fees[i.id] ?? 0) : []),
-      r.total, r.receipt_path ? "Yes" : "No", checkinText(r), r.admin_note,
-    ]);
-    downloadCsv([head, ...lines], `${event.slug}-registrations.csv`);
-  }
-
-  // One row per person, e.g. for name lists and ID badges.
-  const attFields = config.attendees.fields;
-  function exportDelegates() {
-    const head = ["Reference", "Status", "Category", ...attFields.map((f) => f.label), ...fields.map((f) => f.label), "Checked in at", "Submitted"];
-    const lines = filtered.flatMap((r) =>
-      (r.attendees ?? []).map((a, i) => [
-        r.ref_code, r.status, config.fees.items.find((i) => i.id === a.item)?.label ?? "Removed category",
-        ...attFields.map((f) => a.answers[f.id]), ...fields.map((f) => r.answers[f.id]), r.checkin?.[String(i)] ? new Date(r.checkin[String(i)]).toLocaleString() : "", new Date(r.created_at).toLocaleString(),
-      ]),
-    );
-    downloadCsv([head, ...lines], `${event.slug}-delegates.csv`);
-  }
-  const delegateCount = filtered.reduce((s, r) => s + (r.attendees?.length ?? 0), 0);
+  }, [lines, config, rows]);
 
   const cur = config.fees.currency;
+  const filtering = Object.values(filters).some(Boolean);
   if (error) return <p role="alert" className="text-sm text-red-600">{error}</p>;
   if (!rows) return <p className="text-sm text-slate-500">Loading registrations…</p>;
 
   return (
     <div className="space-y-5">
+      {choices.length > 0 && (
+        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+          <p className="w-full text-xs font-semibold uppercase tracking-wide text-slate-500">Filter the dashboard</p>
+          {choices.map((c) => (
+            <label key={choiceKey(c)} className="text-sm">
+              <span className="mb-1 block text-xs font-medium text-slate-600">{c.field.label}{c.scope === "att" && " (delegate)"}</span>
+              <select value={filters[choiceKey(c)] ?? ""} onChange={(e) => setFilters({ ...filters, [choiceKey(c)]: e.target.value })} className={`${input} max-w-56`}>
+                <option value="">All</option>
+                {(c.field.options ?? []).map((o) => <option key={o}>{o}</option>)}
+              </select>
+            </label>
+          ))}
+          {filtering && <button type="button" className={btn} onClick={() => setFilters({})}>Clear filters</button>}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {[
           ["Registrations", stats.count],
@@ -126,23 +105,22 @@ export function Registrations({ event }: { event: EventRow }) {
           </div>
         ))}
       </div>
-      {config.fees.enabled && (
-        <div className="flex flex-wrap gap-2 text-sm">
-          {stats.items.map((i) => <span key={i.id} className="rounded-full border border-slate-200 bg-white px-3 py-1">{i.label}: <b>{i.qty}</b></span>)}
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2 text-sm">
+        {stats.groups.map((g) => <span key={g.name} className="rounded-full border border-slate-200 bg-white px-3 py-1">{g.name}: <b>{g.people}</b> · {money(cur, g.amount)}</span>)}
+        {stats.edits > 0 && <button type="button" onClick={() => setStatus("edit")} className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1 font-semibold text-purple-800">✏️ {stats.edits} edit request{stats.edits > 1 ? "s" : ""} waiting</button>}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, church, code…" aria-label="Search registrations" className={`${input} max-w-xs`} />
-        <select value={status} onChange={(e) => setStatus(e.target.value as Status | "")} aria-label="Filter by status" className={`${input} max-w-44`}>
+        <select value={status} onChange={(e) => setStatus(e.target.value as Status | "edit" | "")} aria-label="Filter by status" className={`${input} max-w-44`}>
           <option value="">All statuses</option>
           <option value="pending">Pending</option>
           <option value="confirmed">Confirmed</option>
           <option value="rejected">Rejected</option>
+          <option value="edit">Edit requested</option>
         </select>
         <button className={btn} onClick={reload}>Refresh</button>
-        <button className={`${btn} ml-auto`} onClick={exportCsv} disabled={!filtered.length}>Export CSV ({filtered.length})</button>
-        {delegateCount > 0 && <button className={btn} onClick={exportDelegates}>Export delegates ({delegateCount})</button>}
+        <Link href={`/admin/events/${event.id}/report`} className="ml-auto rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-blue-700">📊 Create report</Link>
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
@@ -155,11 +133,14 @@ export function Registrations({ event }: { event: EventRow }) {
               <tr key={r.id} onClick={() => setOpen(r)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50">
                 <td className="p-3 whitespace-nowrap text-slate-500">{new Date(r.created_at).toLocaleString()}</td>
                 <td className="p-3 font-mono"><button className="hover:underline">{r.ref_code}</button></td>
-                <td className="p-3">{nameOf(r)}</td>
+                <td className="p-3">{registrantName(config, r.answers)}</td>
                 <td className="p-3 text-right">{money(cur, Number(r.total))}</td>
                 <td className="p-3">{r.receipt_path ? "📎" : "—"}</td>
                 <td className={`p-3 whitespace-nowrap ${checkinCount(r) ? "font-semibold text-green-700" : "text-slate-400"}`}>{checkinCount(r) ? `✓ ${checkinText(r)}` : "—"}</td>
-                <td className="p-3"><span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${STATUS_STYLE[r.status]}`}>{r.status}</span></td>
+                <td className="p-3 whitespace-nowrap">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${STATUS_STYLE[r.status]}`}>{r.status}</span>
+                  {r.pending_change && <span className="ml-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-800">✏️ edit</span>}
+                </td>
               </tr>
             ))}
             {!filtered.length && <tr><td colSpan={7} className="p-6 text-center text-slate-500">No registrations{rows.length ? " match" : " yet"}.</td></tr>}
@@ -169,6 +150,7 @@ export function Registrations({ event }: { event: EventRow }) {
 
       {open && (
         <Detail
+          key={open.id}
           reg={open}
           event={event}
           onClose={() => setOpen(null)}
@@ -215,6 +197,19 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
       else setError(`Status saved, but no email was sent: ${out.error}`);
     }
     setBusy(false);
+  }
+
+  // Approve/reject a registrant's edit (server-side: moderators can't write answers directly).
+  async function decide(action: "approve" | "reject") {
+    setBusy(true);
+    setError("");
+    setInfo("");
+    const res = await authFetch("/api/change", { method: "POST", body: JSON.stringify({ registrationId: reg.id, action }) }).catch(() => null);
+    const out = res ? await res.json() : { error: "Network error" };
+    setBusy(false);
+    if (!res?.ok) return setError(out.error);
+    onSaved(out.registration as Registration);
+    setInfo(action === "approve" ? "Changes approved and applied." : "Changes rejected; the registration stays as it was.");
   }
 
   async function remove() {
@@ -297,6 +292,31 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
             )}
           </div>
         )}
+
+        {reg.pending_change && (() => {
+          const changes = diffChange(config, { answers: reg.answers, attendees: reg.attendees ?? [] }, reg.pending_change);
+          return (
+            <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-3 text-sm">
+              <p className="font-bold text-purple-900">✏️ Edit requested by the registrant</p>
+              <p className="text-xs text-purple-800">Sent {new Date(reg.pending_change.submitted_at).toLocaleString()}. Nothing changes until you approve.</p>
+              <table className="mt-2 w-full text-left text-xs">
+                <thead><tr className="text-purple-800"><th className="py-1 pr-2">Question</th><th className="py-1 pr-2">Now</th><th className="py-1">Requested</th></tr></thead>
+                <tbody>
+                  {changes.map((c) => (
+                    <tr key={c.label} className="border-t border-purple-200 align-top">
+                      <td className="py-1 pr-2 font-medium">{c.label}</td><td className="py-1 pr-2 text-slate-500 line-through">{c.from}</td><td className="py-1 font-semibold">{c.to}</td>
+                    </tr>
+                  ))}
+                  {!changes.length && <tr><td colSpan={3} className="py-1 text-slate-500">No visible differences.</td></tr>}
+                </tbody>
+              </table>
+              <div className="mt-2 flex gap-2">
+                <button disabled={busy} onClick={() => decide("approve")} className="rounded-lg bg-purple-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Approve changes</button>
+                <button disabled={busy} onClick={() => decide("reject")} className={btn}>Reject changes</button>
+              </div>
+            </div>
+          );
+        })()}
 
         <label className="mt-4 block text-sm">
           <span className="mb-1 block font-medium">Note (shown to the registrant on the status page)</span>

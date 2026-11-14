@@ -5,8 +5,10 @@ import { Card, inputClass } from "./RegistrationForm";
 import { money } from "@/lib/validate";
 import { statusLink } from "@/lib/qr";
 import { QrCode } from "./QrCode";
+import { EditRegistration } from "./EditRegistration";
+import type { EventConfig } from "@/lib/types";
 
-type Result = { ref_code: string; status: "pending" | "confirmed" | "rejected"; total: number; created_at: string; note: string | null; name: string };
+type Result = { ref_code: string; status: "pending" | "confirmed" | "rejected"; total: number; created_at: string; note: string | null; name: string; editPending?: boolean };
 
 export const STATUS_STYLE = {
   pending: "bg-amber-100 text-amber-800",
@@ -14,7 +16,8 @@ export const STATUS_STYLE = {
   rejected: "bg-red-100 text-red-800",
 };
 
-export function StatusLookup({ slug, currency, initialCode }: { slug: string; currency: string; initialCode: string }) {
+export function StatusLookup({ slug, currency, initialCode, config }: { slug: string; currency: string; initialCode: string; config: EventConfig }) {
+  const [editing, setEditing] = useState(false);
   const [code, setCode] = useState(initialCode);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState("");
@@ -66,6 +69,10 @@ export function StatusLookup({ slug, currency, initialCode }: { slug: string; cu
             {result.note && <p className="border-t border-slate-200 pt-2 text-slate-600">{result.note}</p>}
           </dl>
         )}
+        {result?.editPending && !editing && <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">✏️ Your requested changes are waiting for the organizers&apos; approval.</p>}
+        {result && (editing
+          ? <EditRegistration slug={slug} code={result.ref_code} config={config} onDone={() => { setEditing(false); lookup(result.ref_code).then(show); }} />
+          : <button type="button" onClick={() => setEditing(true)} className="mt-4 text-sm font-semibold text-[var(--primary)] underline">✏️ Edit my registration</button>)}
       </Card>
     </div>
   );

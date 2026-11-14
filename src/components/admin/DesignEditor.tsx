@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { EventConfig } from "@/lib/types";
 import { FONTS } from "@/lib/defaults";
-import { assetUrl, browserDb } from "@/lib/supabase/browser";
+import { uploadAsset } from "@/lib/upload";
 import { isVideo } from "@/lib/media";
 import { btn, btnDanger, input, Panel, Text, Toggle } from "./ui";
 
@@ -28,18 +28,13 @@ export function DesignEditor({ eventId, config, onChange }: { eventId: string; c
     if (!file) return null;
     setError("");
     setUploading(true);
-    const path = `${eventId}/${crypto.randomUUID()}.${file.name.split(".").pop()?.toLowerCase() ?? "png"}`;
-    const { error } = await browserDb().storage.from("assets").upload(path, file, { contentType: file.type });
+    const r = await uploadAsset(eventId, file);
     setUploading(false);
-    if (error) {
-      setError(
-        /mime type/i.test(error.message) ? `This file type (${file.type || "unknown"}) isn't allowed yet. Video banners need the storage update from the setup guide.`
-        : /size/i.test(error.message) ? "That file is too big. Please use a smaller or more compressed file."
-        : error.message,
-      );
+    if ("error" in r) {
+      setError(r.error);
       return null;
     }
-    return assetUrl(path);
+    return r.url;
   }
 
   return (
@@ -66,6 +61,8 @@ export function DesignEditor({ eventId, config, onChange }: { eventId: string; c
         <Color label="Header background" value={theme.headerBg} onChange={(headerBg) => setTheme({ headerBg })} />
         <Color label="Header text" value={theme.headerText} onChange={(headerText) => setTheme({ headerText })} />
         <Color label="Page background" value={theme.pageBg} onChange={(pageBg) => setTheme({ pageBg })} />
+        <Color label="Footer background" value={theme.footerBg} onChange={(footerBg) => setTheme({ footerBg })} />
+        <Color label="Footer text" value={theme.footerText} onChange={(footerText) => setTheme({ footerText })} />
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-slate-700">Font</span>
           <select value={theme.font} onChange={(e) => setTheme({ font: e.target.value })} className={input}>
@@ -77,12 +74,35 @@ export function DesignEditor({ eventId, config, onChange }: { eventId: string; c
       <Panel title="Images">
         <div className="text-sm">
           <p className="mb-1 font-medium text-slate-700">Header banner (image, GIF or video)</p>
-          {theme.bannerUrl && (isVideo(theme.bannerUrl) ? (
-            <video src={theme.bannerUrl} autoPlay muted loop playsInline className="mb-2 h-24 w-full rounded-lg object-cover" />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={theme.bannerUrl} alt="Banner" className="mb-2 h-24 w-full rounded-lg object-cover" />
-          ))}
+          {theme.bannerUrl && (
+            <>
+              <p className="mb-1 text-xs text-slate-500">Click the part of the banner that should always stay visible in the header.</p>
+              {/* Whole image shown (not cropped) so any spot can be picked; the dot is the chosen focal point. */}
+              <div className="relative mb-2 cursor-crosshair overflow-hidden rounded-lg border border-slate-200" title="Click to set the focus point"
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const pct = (v: number) => Math.round(Math.min(100, Math.max(0, v * 100)));
+                  setTheme({ bannerPosX: pct((e.clientX - r.left) / r.width), bannerPosY: pct((e.clientY - r.top) / r.height) });
+                }}>
+                {isVideo(theme.bannerUrl) ? (
+                  <video src={theme.bannerUrl} autoPlay muted loop playsInline className="block h-auto w-full" />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={theme.bannerUrl} alt="Banner" className="block h-auto w-full" />
+                )}
+                <span aria-hidden className="pointer-events-none absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600/80 shadow" style={{ left: `${theme.bannerPosX}%`, top: `${theme.bannerPosY}%` }} />
+              </div>
+              <div className="mb-2 grid gap-1">
+                {(["bannerPosX", "bannerPosY"] as const).map((k) => (
+                  <label key={k} className="flex items-center gap-3 text-xs">
+                    <span className="w-28 font-medium text-slate-700">{k === "bannerPosX" ? "Left ↔ right" : "Top ↕ bottom"}</span>
+                    <input type="range" min={0} max={100} value={theme[k]} onChange={(e) => setTheme({ [k]: Number(e.target.value) })} className="flex-1 accent-blue-600" />
+                    <span className="w-10 text-right font-mono text-slate-500">{theme[k]}%</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
           <div className="flex gap-2">
             <label className={`${btn} cursor-pointer`}>
               {theme.bannerUrl ? "Replace" : "Upload"} banner

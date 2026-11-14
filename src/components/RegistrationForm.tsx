@@ -32,15 +32,16 @@ export function Card({ title, children }: { title?: string; children: ReactNode 
 }
 
 // `name` must be unique per input: delegate boxes repeat the same fields.
-function FieldInput({ field, value, error, onChange, name = field.id }: { field: Field; value: string | boolean | undefined; error?: string; onChange: (v: string | boolean) => void; name?: string }) {
+export function FieldInput({ field, value, error, onChange, name = field.id }: { field: Field; value: string | boolean | undefined; error?: string; onChange: (v: string | boolean) => void; name?: string }) {
   const id = `f-${name}`;
   const label = (
     <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
       {field.label} {field.required && <span className="text-red-500">*</span>}
     </span>
   );
+  const desc = field.description?.trim() ? <span id={`${id}-desc`} className="mb-1.5 block whitespace-pre-line text-xs text-slate-500">{field.description}</span> : null;
   const str = typeof value === "string" ? value : "";
-  const common = { id, name, required: field.required, "aria-invalid": !!error, placeholder: field.placeholder, className: inputClass };
+  const common = { id, name, required: field.required, "aria-invalid": !!error, "aria-describedby": desc ? `${id}-desc` : undefined, placeholder: field.placeholder, className: inputClass };
   let control: ReactNode;
   if (field.type === "checkbox")
     return (
@@ -49,7 +50,8 @@ function FieldInput({ field, value, error, onChange, name = field.id }: { field:
           <input type="checkbox" id={id} checked={value === true} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" />
           <span>{field.label} {field.required && <span className="text-red-500">*</span>}</span>
         </label>
-        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        {desc && <div className="ml-6 mt-1">{desc}</div>}
+        {error &&<p className="mt-1 text-xs text-red-600">{error}</p>}
       </div>
     );
   else if (field.type === "textarea") control = <textarea {...common} rows={3} value={str} onChange={(e) => onChange(e.target.value)} />;
@@ -65,7 +67,7 @@ function FieldInput({ field, value, error, onChange, name = field.id }: { field:
       <div role="radiogroup" className="flex flex-wrap gap-x-5 gap-y-2 pt-1">
         {(field.options ?? []).map((o) => (
           <label key={o} className="flex items-center gap-2 text-sm">
-            <input type="radio" name={name}checked={str === o} onChange={() => onChange(o)} className="h-4 w-4 accent-[var(--primary)]" />
+            <input type="radio" name={name} checked={str === o} onChange={() => onChange(o)} className="h-4 w-4 accent-[var(--primary)]" />
             {o}
           </label>
         ))}
@@ -76,6 +78,7 @@ function FieldInput({ field, value, error, onChange, name = field.id }: { field:
   return (
     <div className={field.half ? "" : "@xl:col-span-2"}>
       {field.type === "radio" ? <div>{label}</div> : <label htmlFor={id}>{label}</label>}
+      {desc}
       {control}
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
@@ -102,6 +105,19 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
   const slots = attendeeSlots(config, qty);
   const needsProof =payment.enabled && payment.requireProof && total > 0;
   const setQ = (id: string, n: number) => setQty((q) => ({ ...q, [id]: Math.max(0, Math.min(500, Math.floor(n) || 0)) }));
+  // The QR lives on another domain (Supabase), where a plain download link just opens it, so fetch it as a file first.
+  const downloadPaymentQr = async () => {
+    try {
+      const blob = await fetch(payment.qrUrl).then((r) => (r.ok ? r.blob() : Promise.reject()));
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `payment-qr.${blob.type.split("/")[1]?.replace("jpeg", "jpg") || "png"}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    } catch {
+      window.open(payment.qrUrl, "_blank"); // fallback: open it so they can long-press to save
+    }
+  };
 
   if (!event.is_open && !preview)
     return <Card title="Registration closed"><p className="text-sm text-slate-600">Registration for this event is no longer accepting entries.</p></Card>;
@@ -236,6 +252,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
       <div className="space-y-6 min-w-0">
         {config.sections.map((s) => (
           <Card key={s.id} title={s.title}>
+            {s.description?.trim() && <p className="-mt-2 mb-4 whitespace-pre-line text-sm text-slate-600">{s.description}</p>}
             <div className="grid gap-4 @xl:grid-cols-2">
               {s.fields.map((f) => (
                 <FieldInput key={f.id} field={f} value={answers[f.id]} error={errors[f.id]} onChange={(v) => setAnswers((a) => ({ ...a, [f.id]: v }))} />
@@ -325,6 +342,13 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
                   <div className="flex justify-between gap-2"><dt className="text-xs text-slate-500">ACCOUNT NAME</dt><dd className="font-mono font-bold">{payment.accountName}</dd></div>
                   <div className="flex justify-between gap-2"><dt className="text-xs text-slate-500">ACCOUNT NUMBER</dt><dd className="font-mono font-bold text-[var(--primary)]">{payment.accountNumber}</dd></div>
                 </dl>
+              )}
+              {payment.qrUrl && (
+                <div className="mt-3 flex flex-col items-center gap-2 rounded-lg bg-white p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={payment.qrUrl} alt="Payment QR code" className="h-44 w-44 object-contain" />
+                  <button type="button" onClick={downloadPaymentQr} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">⬇ Download QR code</button>
+                </div>
               )}
             </div>
           )}

@@ -54,7 +54,7 @@ ${qrUrl && kind !== "rejected" ? `<img src="${esc(qrUrl)}" width="180" height="1
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px">${rows}</table>
 <p style="margin:24px 0 0;text-align:center"><a href="${esc(statusUrl)}" style="display:inline-block;background:${theme.primary};color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px">Check your registration status</a></p>
 </td></tr>
-<tr><td style="padding:14px 28px;background:#f8fafc;color:#94a3b8;font-size:12px;text-align:center">${esc(config.footer).replace(/\n/g, "<br>")}</td></tr>
+<tr><td style="padding:14px 28px;background:${theme.footerBg};color:${theme.footerText};font-size:12px;text-align:center">${esc(config.footer).replace(/\n/g, "<br>")}</td></tr>
 </table></td></tr></table></body></html>`;
 
   const text = [

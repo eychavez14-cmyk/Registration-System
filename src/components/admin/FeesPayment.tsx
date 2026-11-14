@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import type { EventConfig, FeeItem } from "@/lib/types";
+import { uploadAsset } from "@/lib/upload";
 import { newId } from "@/lib/defaults";
 import { btn, btnDanger, move, Panel, Text, Toggle } from "./ui";
 import { FieldsEditor } from "./FormBuilder";
 
-export function FeesPayment({ config, onChange }: { config: EventConfig; onChange: (c: EventConfig) => void }) {
+export function FeesPayment({ eventId, config, onChange }: { eventId: string; config: EventConfig; onChange: (c: EventConfig) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [qrError, setQrError] = useState("");
   const { fees, payment } = config;
   const setFees = (patch: Partial<EventConfig["fees"]>) => onChange({ ...config, fees: { ...fees, ...patch } });
   const setAttendees = (patch: Partial<EventConfig["attendees"]>) => onChange({ ...config, attendees: { ...config.attendees, ...patch } });
@@ -47,6 +51,32 @@ export function FeesPayment({ config, onChange }: { config: EventConfig; onChang
             <div className="grid gap-3 sm:grid-cols-2">
               <Text label="Account name" value={payment.accountName} onChange={(accountName) => setPayment({ accountName })} />
               <Text label="Account number" value={payment.accountNumber} onChange={(accountNumber) => setPayment({ accountNumber })} />
+            </div>
+            <div className="text-sm">
+              <p className="mb-1 font-medium text-slate-700">Payment QR code (optional)</p>
+              <p className="mb-2 text-xs text-slate-500">Upload your GCash/bank QR image. Registrants see it on the form with a <b>Download QR code</b> button.</p>
+              {payment.qrUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={payment.qrUrl} alt="Payment QR code" className="mb-2 h-40 w-40 rounded-lg border border-slate-200 bg-white object-contain p-1" />
+              )}
+              <div className="flex gap-2">
+                <label className={`${btn} cursor-pointer`}>
+                  {uploading ? "Uploading…" : payment.qrUrl ? "Replace QR image" : "Upload QR image"}
+                  <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    setUploading(true);
+                    setQrError("");
+                    const r = await uploadAsset(eventId, file);
+                    setUploading(false);
+                    if ("error" in r) setQrError(r.error);
+                    else setPayment({ qrUrl: r.url });
+                  }} />
+                </label>
+                {payment.qrUrl && <button type="button" className={btnDanger} onClick={() => setPayment({ qrUrl: "" })}>Remove</button>}
+              </div>
+              {qrError && <p role="alert" className="mt-1 text-sm text-red-600">{qrError}</p>}
             </div>
             <Toggle label="Require proof of payment upload" checked={payment.requireProof} onChange={(requireProof) => setPayment({ requireProof })} hint="Only when the total is above zero. PNG, JPG or PDF up to 5MB." />
             <Text label="Upload note" value={payment.proofNote} onChange={(proofNote) => setPayment({ proofNote })} />

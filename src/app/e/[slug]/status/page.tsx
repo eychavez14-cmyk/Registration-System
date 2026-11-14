@@ -14,7 +14,7 @@ async function Status({ params, searchParams }: PageProps<"/e/[slug]/status">) {
   const code = (await searchParams).code;
   return (
     <EventShell event={event} tab="status">
-      <StatusLookup slug={event.slug} currency={event.config.fees.currency} initialCode={typeof code === "string" ? code : ""} />
+      <StatusLookup slug={event.slug} currency={event.config.fees.currency} config={event.config} initialCode={typeof code === "string" ? code : ""} />
     </EventShell>
   );
 }

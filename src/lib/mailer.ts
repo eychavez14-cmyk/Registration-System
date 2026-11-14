@@ -9,7 +9,7 @@ let transport: Transporter | undefined;
 type Result = { sent: true; to: string } | { sent: false; reason: string };
 
 // Emails the registrant. Never throws: a failed email must not break a registration or a status change.
-export async function notifyRegistrant(kind: EmailKind, event: Pick<EventRow, "slug" | "title" | "config">, reg: Pick<Registration, "ref_code" | "answers" | "fees" | "attendees" | "total" | "admin_note">, origin: string): Promise<Result> {
+export async function notifyRegistrant(kind: EmailKind, event: Pick<EventRow, "slug" | "title" | "config">, reg: Pick<Registration, "ref_code" | "answers" | "fees" | "attendees" | "total" | "admin_note">, origin: string, attachments: { filename: string; content: Buffer; contentType?: string }[] = []): Promise<Result> {
   const user = process.env.GMAIL_USER, pass = process.env.GMAIL_APP_PASSWORD;
   if (!event.config.emails.enabled) return { sent: false, reason: "Emails are turned off for this event" };
   if (!user || !pass) return { sent: false, reason: "Email isn't set up yet (GMAIL_USER / GMAIL_APP_PASSWORD)" };
@@ -21,7 +21,7 @@ export async function notifyRegistrant(kind: EmailKind, event: Pick<EventRow, "s
   const { subject, html, text } = buildEmail({ kind, title: event.title, config: event.config, reg, statusUrl, qrUrl });
   try {
     transport ??= nodemailer.createTransport({ service: "gmail", auth: { user, pass } });
-    await transport.sendMail({ from: { name: fromName(event), address: user }, to, subject, html, text });
+    await transport.sendMail({ from: { name: fromName(event), address: user }, to, subject, html, text, attachments });
     return { sent: true, to };
   } catch (e) {
     console.error("Email failed:", e);

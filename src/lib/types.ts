@@ -9,9 +9,10 @@ export type Field = {
   placeholder?: string;
   options?: string[]; // select / radio
   half?: boolean; // half-width on desktop
+  description?: string; // small help text under the question
 };
 
-export type Section = { id: string; title: string; fields: Field[] };
+export type Section = { id: string; title: string; description?: string; fields: Field[] };
 
 export type EmailText = { subject: string; heading: string; message: string };
 
@@ -29,6 +30,10 @@ export type EventConfig = {
     bannerUrl: string; // image, GIF or video (mp4/webm)
     overlayColor: string; // tint over the banner
     overlayOpacity: number; // 0-100
+    bannerPosX: number; // 0-100: which part of the banner stays in view (like CSS background-position)
+    bannerPosY: number;
+    footerBg: string;
+    footerText: string;
     logoUrls: string[];
   };
   sections: Section[];
@@ -42,6 +47,7 @@ export type EventConfig = {
     accountNumber: string;
     requireProof: boolean;
     proofNote: string;
+    qrUrl: string; // optional payment QR image (e.g. GCash), downloadable on the form
   };
   // Emails to the registrant. Texts may use {event} {ref} {name} {total}.
   emails: { enabled: boolean; fromName: string; received: EmailText; confirmed: EmailText; rejected: EmailText };
@@ -78,4 +84,6 @@ export type Registration = {
   status: Status;
   admin_note: string | null;
   created_at: string;
+  // Registrant-submitted edit waiting for staff approval (null when none).
+  pending_change: { answers: Answers; attendees: Attendee[]; submitted_at: string } | null;
 };

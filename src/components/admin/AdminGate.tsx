@@ -44,7 +44,7 @@ function Guard({ children }: { children: ReactNode }) {
   return (
     <RoleContext.Provider value={state.role}>
       <div className="min-h-full flex flex-col">
-        <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-200 bg-white px-4 sm:px-6 py-3">
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-200 bg-white px-4 sm:px-6 py-3 print:hidden">
           <Link href="/admin" className="font-extrabold tracking-tight">Registration Admin</Link>
           {navLink("/admin", "Events")}
           {state.role === "admin" && navLink("/admin/users", "Users")}

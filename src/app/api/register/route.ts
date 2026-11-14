@@ -39,8 +39,14 @@ export async function POST(req: Request) {
       event_id: event.id, ref_code, answers: v.answers, fees: v.fees, attendees: v.attendees, total: v.total, receipt_path: receipt,
     });
     if (!error) {
+      // Attach the uploaded receipt so the registrant has a copy (best effort: no attachment if the download fails).
+      const attachments = [];
+      if (receipt) {
+        const { data: file } = await db.storage.from("receipts").download(receipt);
+        if (file) attachments.push({ filename: `receipt-${ref_code}.${receipt.split(".").pop()}`, content: Buffer.from(await file.arrayBuffer()), contentType: file.type });
+      }
       // Awaited so serverless hosts don't cut it off; notifyRegistrant never throws.
-      const email = await notifyRegistrant("received", { ...event, config }, { ref_code, answers: v.answers, fees: v.fees, attendees: v.attendees, total: v.total, admin_note: null }, new URL(req.url).origin);
+      const email = await notifyRegistrant("received", { ...event, config }, { ref_code, answers: v.answers, fees: v.fees, attendees: v.attendees, total: v.total, admin_note: null }, new URL(req.url).origin, attachments);
       return Response.json({ ref_code, total: v.total, emailedTo: email.sent ? email.to : null });
     }
     if (error.code !== "23505") break; // only retry on ref_code collision

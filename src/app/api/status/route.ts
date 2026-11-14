@@ -9,7 +9,7 @@ export async function GET(req: Request) {
 
   const { data } = await serviceDb()
     .from("registrations")
-    .select("ref_code, status, total, created_at, admin_note, answers, events!inner(slug)")
+    .select("ref_code, status, total, created_at, admin_note, answers, pending_change, events!inner(slug)")
     .eq("ref_code", code)
     .eq("events.slug", slug)
     .maybeSingle();
@@ -19,6 +19,6 @@ export async function GET(req: Request) {
   const name = [a.first_name, a.last_name].filter((x) => typeof x === "string").join(" ");
   return Response.json({
     ref_code: data.ref_code, status: data.status, total: data.total, created_at: data.created_at,
-    note: data.admin_note, name: name.replace(/(\S)\S*/g, "$1***"), // masked so a guessed code leaks little
+    note: data.admin_note, editPending: !!data.pending_change, name: name.replace(/(\S)\S*/g, "$1***"), // masked so a guessed code leaks little
   });
 }

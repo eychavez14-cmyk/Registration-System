@@ -17,6 +17,10 @@ export const defaultConfig = (): EventConfig => ({
     bannerUrl: "",
     overlayColor: "#000000",
     overlayOpacity: 35,
+    bannerPosX: 50,
+    bannerPosY: 50,
+    footerBg: "#ffffff",
+    footerText: "#94a3b8",
     logoUrls: [],
   },
   sections: [
@@ -60,6 +64,7 @@ export const defaultConfig = (): EventConfig => ({
     accountNumber: "09xxxxxxxxx",
     requireProof: true,
     proofNote: "Only ONE (1) file is accepted. Merge multiple receipts into a single image or PDF if needed.",
+    qrUrl: "",
   },
   emails: {
     enabled: true,

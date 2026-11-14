@@ -18,7 +18,7 @@ import { EmailEditor } from "@/components/admin/EmailEditor";
 import { sampleRegistration } from "@/lib/sample";
 import { ConfirmButton, Panel, Text, Toggle } from "@/components/admin/ui";
 
-const TABS = { registrations: "Registrations", checkin: "Check-In", form: "Form fields", fees: "Fees & payment", design: "Design", emails: "Emails", settings: "Settings" } as const;
+const TABS = { registrations: "Registration Dashboard", checkin: "Check-In", form: "Form fields", fees: "Fees & payment", design: "Design", emails: "Emails", settings: "Settings" } as const;
 type Tab = keyof typeof TABS;
 
 // Drop blank select/radio options left over from editing.
@@ -120,7 +120,7 @@ export default function EventEditor() {
         <div className="grid gap-6 xl:grid-cols-[460px_1fr] items-start">
           <div className="min-w-0">
             {tab === "form" && <FormBuilder config={draft.config} onChange={setConfig} hasRegistrations={hasRegs} />}
-            {tab === "fees" && <FeesPayment config={draft.config} onChange={setConfig} />}
+            {tab === "fees" && <FeesPayment eventId={id} config={draft.config} onChange={setConfig} />}
             {tab === "design" && <DesignEditor eventId={id} config={draft.config} onChange={setConfig} />}
           </div>
           <div className="min-w-0 xl:sticky xl:top-36">
