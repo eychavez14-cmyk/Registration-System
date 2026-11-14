@@ -172,6 +172,11 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
             <p className="mt-2 text-xs text-slate-500">Submitted {done.at} · Pending verification</p>
             <p className="mt-1 text-xs font-medium text-slate-600">Show this QR code (or your registration number) at check-in.</p>
             {done.emailedTo && <p className="mt-1 text-xs font-medium text-green-700">A copy was emailed to {done.emailedTo}</p>}
+            <div className="mt-4 flex flex-wrap gap-2 print:hidden">
+              <button type="button" onClick={() => window.print()} className={`${actionBtn} border border-slate-300 bg-white text-slate-800 hover:bg-slate-50`}>🖨 Print</button>
+              <button type="button" onClick={saveImage} disabled={saving} className={`${actionBtn} bg-[var(--primary)] text-white hover:brightness-110`}>{saving ? "Creating image…" : "⬇ Save as image"}</button>
+            </div>
+            {message && <p role="alert" className="mt-2 text-sm text-red-700 print:hidden">{message}</p>}
           </div>
           {config.successNextSteps.trim() && (
             <div className="mb-6 rounded-xl border border-[var(--primary)]/25 bg-[var(--primary)]/5 p-4">
@@ -197,11 +202,6 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
               </div>
             ))}
           </div>
-          <div className="mt-6 flex flex-wrap gap-2 print:hidden">
-            <button type="button" onClick={() => window.print()} className={`${actionBtn} border border-slate-300 bg-white text-slate-800 hover:bg-slate-50`}>🖨 Print</button>
-            <button type="button" onClick={saveImage} disabled={saving} className={`${actionBtn} bg-[var(--primary)] text-white hover:brightness-110`}>{saving ? "Creating image…" : "⬇ Save as image"}</button>
-          </div>
-          {message && <p role="alert" className="mt-3 text-sm text-red-700 print:hidden">{message}</p>}
           {!config.successNextSteps.trim() && <Link href={statusPath} className="mt-4 inline-block text-sm font-semibold text-[var(--primary)] underline print:hidden">Check registration status</Link>}
         </Card>
       </div>
