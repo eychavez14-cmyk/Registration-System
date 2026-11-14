@@ -16,7 +16,7 @@ export type Section = { id: string; title: string; description?: string; fields:
 
 export type EmailText = { subject: string; heading: string; message: string };
 
-export type FeeItem = { id: string; label: string; price: number };
+export type FeeItem = { id: string; label: string; price: number; description?: string }; // description: small text under the name on the form
 
 export type EventConfig = {
   header: { subtitle: string; venue: string };

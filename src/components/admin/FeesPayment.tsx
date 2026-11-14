@@ -27,6 +27,7 @@ export function FeesPayment({ eventId, config, onChange }: { eventId: string; co
             <button type="button" className={btn} aria-label="Move up" onClick={() => setFees({ items: move(fees.items, i, -1) })}>↑</button>
             <button type="button" className={btn} aria-label="Move down" onClick={() => setFees({ items: move(fees.items, i, 1) })}>↓</button>
             <button type="button" className={btnDanger} onClick={() => setFees({ items: fees.items.filter((_, j) => j !== i) })}>Remove</button>
+            <div className="w-full"><Text label="Description (optional, shown under the category name)" value={item.description ?? ""} onChange={(description) => setItem(i, { description })} /></div>
           </div>
         ))}
         <button type="button" className={btn} onClick={() => setFees({ items: [...fees.items, { id: newId(), label: "New category", price: 0 }] })}>+ Add category</button>

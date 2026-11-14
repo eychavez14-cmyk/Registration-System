@@ -275,7 +275,10 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
                 <tbody>
                   {feeCfg.items.map((i) => (
                     <tr key={i.id} className="border-b border-slate-100 last:border-0">
-                      <td className="py-3 pr-2 font-medium">{i.label}</td>
+                      <td className="py-3 pr-2">
+                        <span className="font-medium">{i.label}</span>
+                        {i.description?.trim() && <span className="mt-0.5 block whitespace-pre-line text-xs text-slate-500">{i.description}</span>}
+                      </td>
                       <td className="py-3 px-2 text-slate-600">{money(feeCfg.currency, i.price)}</td>
                       <td className="py-3 px-2">
                         <div className="mx-auto flex w-fit items-center rounded-lg border border-slate-300">
