@@ -20,8 +20,14 @@ export async function POST(req: Request) {
   if (!data || !config || !contactMatches(config, data.answers, String(body.contact ?? "")))
     return Response.json({ error: "That email or mobile number doesn't match this registration." }, { status: 403 });
 
-  if (body.action === "open")
-    return Response.json({ answers: data.answers, attendees: data.attendees ?? [], fees: data.fees, pending: !!data.pending_change, hasReceipt: !!data.receipt_path });
+  if (body.action === "open") {
+    // Receipts are private: hand the verified registrant short-lived links to view their own files.
+    const link = async (path?: string | null) => (path ? (await db.storage.from("receipts").createSignedUrl(path, 600)).data?.signedUrl ?? null : null);
+    return Response.json({
+      answers: data.answers, attendees: data.attendees ?? [], fees: data.fees, pending: !!data.pending_change, hasReceipt: !!data.receipt_path,
+      receiptUrl: await link(data.receipt_path), pendingReceiptUrl: await link(data.pending_change?.receipt_path),
+    });
+  }
 
   if (body.action === "submit") {
     // Same validation as a new registration; delegate count and amounts stay as registered.

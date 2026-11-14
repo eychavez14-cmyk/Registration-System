@@ -10,7 +10,7 @@ import { shrinkImage } from "@/lib/shrink";
 // Registrant edits their own answers. Step 1 proves who they are; step 2 edits; changes wait for staff approval.
 export function EditRegistration({ slug, code, config, onDone }: { slug: string; code: string; config: EventConfig; onDone: () => void }) {
   const [contact, setContact] = useState("");
-  const [data, setData] = useState<{ answers: Answers; attendees: Attendee[]; fees: Record<string, number>; pending: boolean; hasReceipt: boolean } | null>(null);
+  const [data, setData] = useState<{ answers: Answers; attendees: Attendee[]; fees: Record<string, number>; pending: boolean; hasReceipt: boolean; receiptUrl: string | null; pendingReceiptUrl: string | null } | null>(null);
   const [file, setFile] = useState<File | null>(null); // replacement proof of payment
   const [preparing, setPreparing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -114,6 +114,8 @@ export function EditRegistration({ slug, code, config, onDone }: { slug: string;
         <fieldset>
           <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Proof of payment</legend>
           <p className="mb-2 text-xs text-slate-600">{data.hasReceipt ? "We have your receipt on file. Upload a new one only if you need to replace it." : "No receipt on file yet. You can upload one here."}</p>
+          {data.receiptUrl && <ReceiptPreview url={data.receiptUrl} label="Your receipt on file" />}
+          {data.pendingReceiptUrl && <ReceiptPreview url={data.pendingReceiptUrl} label="New receipt waiting for approval" />}
           <label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-slate-300 p-3 text-center text-sm hover:bg-slate-50">
             <input type="file" accept="image/png,image/jpeg,application/pdf" className="sr-only" onChange={async (e) => {
               const picked = e.target.files?.[0];
@@ -137,5 +139,24 @@ export function EditRegistration({ slug, code, config, onDone }: { slug: string;
         <button type="button" onClick={onDone} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
       </div>
     </form>
+  );
+}
+
+// Thumbnail of an uploaded receipt (signed link from the server); PDFs open in a new tab.
+function ReceiptPreview({ url, label }: { url: string; label: string }) {
+  const isPdf = /\.pdf(\?|$)/i.test(url);
+  return (
+    <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+      <p className="mb-1 text-xs font-semibold text-slate-600">{label}</p>
+      {isPdf ? (
+        <a href={url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-[var(--primary)] underline">📄 Open PDF receipt</a>
+      ) : (
+        <a href={url} target="_blank" rel="noreferrer" title="Open full size">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt={label} className="max-h-56 rounded-md border border-slate-200 bg-white object-contain" />
+        </a>
+      )}
+      <p className="mt-1 text-[11px] text-slate-400">Tap to open full size. This link expires in 10 minutes.</p>
+    </div>
   );
 }
