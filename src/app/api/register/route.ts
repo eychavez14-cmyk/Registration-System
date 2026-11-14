@@ -3,6 +3,7 @@ import { makeRefCode, validateSubmission } from "@/lib/validate";
 import type { EventRow } from "@/lib/types";
 import { withDefaults } from "@/lib/defaults";
 import { notifyRegistrant } from "@/lib/mailer";
+import { checkReceipt } from "@/lib/receipts";
 
 // shortcut: no rate limiting or captcha; add Vercel Firewall rules or Turnstile if spam shows up.
 export async function POST(req: Request) {
@@ -21,14 +22,8 @@ export async function POST(req: Request) {
   let receipt: string | null = null;
   const needsProof = config.payment.enabled && config.payment.requireProof && v.total > 0;
   if (typeof body.receiptPath === "string" && body.receiptPath) {
-    // Must be a file we issued for this event, and it must actually have been uploaded.
-    const [folder, name, extra] = body.receiptPath.split("/");
-    const { data: found } = folder === event.id && name && !extra
-      ? await db.storage.from("receipts").list(folder, { search: name, limit: 1 })
-      : { data: null };
-    if (!found?.some((f) => f.name === name)) return Response.json({ error: "Receipt upload not found, please upload again" }, { status: 400 });
-    const { count } = await db.from("registrations").select("id", { count: "exact", head: true }).eq("receipt_path", body.receiptPath);
-    if (count) return Response.json({ error: "This receipt was already used, please upload it again" }, { status: 400 });
+    const problem = await checkReceipt(db, event.id, body.receiptPath);
+    if (problem) return Response.json({ error: problem }, { status: 400 });
     receipt = body.receiptPath;
   }
   if (needsProof && !receipt) return Response.json({ error: "Please upload your proof of payment" }, { status: 400 });

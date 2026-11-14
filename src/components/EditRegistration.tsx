@@ -4,11 +4,15 @@ import { useState } from "react";
 import type { Answers, Attendee, EventConfig } from "@/lib/types";
 import { attendeeSlots, validateSubmission } from "@/lib/validate";
 import { FieldInput, inputClass } from "./RegistrationForm";
+import { browserDb } from "@/lib/supabase/browser";
+import { shrinkImage } from "@/lib/shrink";
 
 // Registrant edits their own answers. Step 1 proves who they are; step 2 edits; changes wait for staff approval.
 export function EditRegistration({ slug, code, config, onDone }: { slug: string; code: string; config: EventConfig; onDone: () => void }) {
   const [contact, setContact] = useState("");
-  const [data, setData] = useState<{ answers: Answers; attendees: Attendee[]; fees: Record<string, number>; pending: boolean } | null>(null);
+  const [data, setData] = useState<{ answers: Answers; attendees: Attendee[]; fees: Record<string, number>; pending: boolean; hasReceipt: boolean } | null>(null);
+  const [file, setFile] = useState<File | null>(null); // replacement proof of payment
+  const [preparing, setPreparing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,7 +65,18 @@ export function EditRegistration({ slug, code, config, onDone }: { slug: string;
       const v = validateSubmission(config, data.answers, data.fees, attendees);
       setErrors(v.errors);
       if (Object.keys(v.errors).length) return setMsg({ ok: false, text: "Please fix the highlighted fields." });
-      const r = await call({ action: "submit", answers: data.answers, attendees });
+      let receiptPath: string | undefined;
+      if (file) {
+        // Same path as the registration form: get a one-time upload link, send the file straight to storage.
+        setBusy(true);
+        const res = await fetch("/api/upload-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug, type: file.type, size: file.size }) }).catch(() => null);
+        const up = res ? await res.json() : { error: "Network error, please try again" };
+        const sent = res?.ok && !(await browserDb().storage.from("receipts").uploadToSignedUrl(up.path, up.token, file, { contentType: file.type })).error;
+        setBusy(false);
+        if (!sent) return setMsg({ ok: false, text: res?.ok ? "Receipt upload failed, please try again." : up.error });
+        receiptPath = up.path;
+      }
+      const r = await call({ action: "submit", answers: data.answers, attendees, receiptPath });
       if (r.ok) setMsg({ ok: true, text: "" });
       else { setErrors(r.out.errors ?? {}); setMsg({ ok: false, text: r.out.error }); }
     }}>
@@ -95,9 +110,30 @@ export function EditRegistration({ slug, code, config, onDone }: { slug: string;
           </div>
         </fieldset>
       )}
+      {config.payment.enabled && (
+        <fieldset>
+          <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Proof of payment</legend>
+          <p className="mb-2 text-xs text-slate-600">{data.hasReceipt ? "We have your receipt on file. Upload a new one only if you need to replace it." : "No receipt on file yet. You can upload one here."}</p>
+          <label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-slate-300 p-3 text-center text-sm hover:bg-slate-50">
+            <input type="file" accept="image/png,image/jpeg,application/pdf" className="sr-only" onChange={async (e) => {
+              const picked = e.target.files?.[0];
+              if (!picked) return;
+              setPreparing(true);
+              const f = await shrinkImage(picked);
+              setPreparing(false);
+              if (f.size > 5 * 1024 * 1024) return setMsg({ ok: false, text: "File must be 5MB or smaller" });
+              setMsg(null);
+              setFile(f);
+            }} />
+            <span className="font-semibold text-slate-700">{preparing ? "Preparing image…" : file ? `New receipt: ${file.name}` : data.hasReceipt ? "Replace receipt / screenshot" : "Upload receipt / screenshot"}</span>
+            <span className="text-xs text-slate-400">PNG, JPG or PDF (Max 5MB)</span>
+          </label>
+          {file && <button type="button" onClick={() => setFile(null)} className="mt-1 text-xs text-slate-500 underline">Keep my current receipt instead</button>}
+        </fieldset>
+      )}
       {msg && !msg.ok && <p role="alert" className="text-sm text-red-600">{msg.text}</p>}
       <div className="flex gap-2">
-        <button disabled={busy} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">{busy ? "Sending…" : "Send update for approval"}</button>
+        <button disabled={busy || preparing} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">{busy ? "Sending…" : "Send update for approval"}</button>
         <button type="button" onClick={onDone} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
       </div>
     </form>

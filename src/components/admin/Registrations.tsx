@@ -165,6 +165,7 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
   const ref = useRef<HTMLDialogElement>(null);
   const [note, setNote] = useState(reg.admin_note ?? "");
   const [receipt, setReceipt] = useState<string | null>(null);
+  const [newReceipt, setNewReceipt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -177,6 +178,11 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
     ref.current?.showModal();
     if (reg.receipt_path) browserDb().storage.from("receipts").createSignedUrl(reg.receipt_path, 600).then(({ data }) => setReceipt(data?.signedUrl ?? null));
   }, [reg.receipt_path]);
+  // Staff can preview a replacement receipt before approving it (private bucket: short-lived link).
+  useEffect(() => {
+    const p = reg.pending_change?.receipt_path;
+    if (p) browserDb().storage.from("receipts").createSignedUrl(p, 600).then(({ data }) => setNewReceipt(data?.signedUrl ?? null));
+  }, [reg.pending_change?.receipt_path]);
 
   async function save(patch: Partial<Registration>) {
     setBusy(true);
@@ -307,7 +313,13 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
                       <td className="py-1 pr-2 font-medium">{c.label}</td><td className="py-1 pr-2 text-slate-500 line-through">{c.from}</td><td className="py-1 font-semibold">{c.to}</td>
                     </tr>
                   ))}
-                  {!changes.length && <tr><td colSpan={3} className="py-1 text-slate-500">No visible differences.</td></tr>}
+                  {reg.pending_change.receipt_path && (
+                    <tr className="border-t border-purple-200 align-top">
+                      <td className="py-1 pr-2 font-medium">Proof of payment</td><td className="py-1 pr-2 text-slate-500">{reg.receipt_path ? "Current file" : "None"}</td>
+                      <td className="py-1 font-semibold">{newReceipt ? <a href={newReceipt} target="_blank" rel="noreferrer" className="text-purple-800 underline">Replaced, view new file ↗</a> : "Replaced (loading…)"}</td>
+                    </tr>
+                  )}
+                  {!changes.length && !reg.pending_change.receipt_path && <tr><td colSpan={3} className="py-1 text-slate-500">No visible differences.</td></tr>}
                 </tbody>
               </table>
               <div className="mt-2 flex gap-2">

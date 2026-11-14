@@ -85,5 +85,5 @@ export type Registration = {
   admin_note: string | null;
   created_at: string;
   // Registrant-submitted edit waiting for staff approval (null when none).
-  pending_change: { answers: Answers; attendees: Attendee[]; submitted_at: string } | null;
+  pending_change: { answers: Answers; attendees: Attendee[]; receipt_path?: string; submitted_at: string } | null; // receipt_path: replacement proof of payment
 };
