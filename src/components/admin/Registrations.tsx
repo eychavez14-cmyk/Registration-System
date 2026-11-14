@@ -228,14 +228,18 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
   }
 
   return (
-    <dialog ref={ref} onClose={onClose} className="m-auto w-[min(640px,calc(100vw-2rem))] rounded-2xl p-0 backdrop:bg-black/40">
-      <div className="max-h-[85vh] overflow-y-auto p-5 sm:p-6">
-        <div className="flex items-center gap-3">
-          <h2 className="font-mono text-xl font-bold">{reg.ref_code}</h2>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${STATUS_STYLE[reg.status]}`}>{reg.status}</span>
-          <button onClick={() => ref.current?.close()} aria-label="Close" className="ml-auto text-2xl leading-none text-slate-400 hover:text-slate-800">×</button>
+    // Clicking the dimmed area outside the box closes it (the click lands on the <dialog> itself, not its content).
+    <dialog ref={ref} onClose={onClose} onClick={(e) => { if (e.target === e.currentTarget) ref.current?.close(); }} className="m-auto w-[min(640px,calc(100vw-2rem))] rounded-2xl p-0 backdrop:bg-black/40">
+      <div className="max-h-[85vh] overflow-y-auto px-5 pb-5 sm:px-6 sm:pb-6">
+        {/* Pinned while scrolling so Close is always reachable */}
+        <div className="sticky top-0 z-10 -mx-5 mb-1 border-b border-slate-200 bg-white/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+          <div className="flex items-center gap-3">
+            <h2 className="font-mono text-xl font-bold">{reg.ref_code}</h2>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${STATUS_STYLE[reg.status]}`}>{reg.status}</span>
+            <button onClick={() => ref.current?.close()} aria-label="Close" className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-900">×</button>
+          </div>
+          <p className="text-xs text-slate-500">{new Date(reg.created_at).toLocaleString()}</p>
         </div>
-        <p className="text-xs text-slate-500">{new Date(reg.created_at).toLocaleString()}</p>
 
         {config.sections.map((s) => (
           <div key={s.id} className="mt-4">
@@ -366,6 +370,7 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
           <button disabled={busy} onClick={() => save({ admin_note: note || null })} className={btn}>Save note</button>
           {isAdmin && <div className="ml-auto"><ConfirmButton label="Delete" question={`Permanently delete ${reg.ref_code} and its receipt? This cannot be undone.`} onConfirm={remove} /></div>}
         </div>
+        <button type="button" onClick={() => ref.current?.close()} className={`${btn} mt-4 w-full`}>Close</button>
       </div>
     </dialog>
   );
