@@ -1,0 +1,81 @@
+export const FIELD_TYPES = ["text", "email", "tel", "number", "textarea", "select", "radio", "checkbox", "date"] as const;
+export type FieldType = (typeof FIELD_TYPES)[number];
+
+export type Field = {
+  id: string;
+  label: string;
+  type: FieldType;
+  required: boolean;
+  placeholder?: string;
+  options?: string[]; // select / radio
+  half?: boolean; // half-width on desktop
+};
+
+export type Section = { id: string; title: string; fields: Field[] };
+
+export type EmailText = { subject: string; heading: string; message: string };
+
+export type FeeItem = { id: string; label: string; price: number };
+
+export type EventConfig = {
+  header: { subtitle: string; venue: string };
+  intro: { enabled: boolean; seconds: number }; // opening animation on the registration form
+  theme: {
+    primary: string;
+    headerBg: string;
+    headerText: string;
+    pageBg: string;
+    font: string;
+    bannerUrl: string; // image, GIF or video (mp4/webm)
+    overlayColor: string; // tint over the banner
+    overlayOpacity: number; // 0-100
+    logoUrls: string[];
+  };
+  sections: Section[];
+  fees: { enabled: boolean; title: string; currency: string; items: FeeItem[] };
+  // Per-person questions, repeated once per ticket bought (e.g. 2 Regular Delegates -> 2 boxes).
+  attendees: { enabled: boolean; title: string; fields: Field[] };
+  payment: {
+    enabled: boolean;
+    instructions: string;
+    accountName: string;
+    accountNumber: string;
+    requireProof: boolean;
+    proofNote: string;
+  };
+  // Emails to the registrant. Texts may use {event} {ref} {name} {total}.
+  emails: { enabled: boolean; fromName: string; received: EmailText; confirmed: EmailText; rejected: EmailText };
+  successMessage: string;
+  successNextSteps: string; // "What happens next" box on the success screen
+  footer: string;
+};
+
+export type EventRow = {
+  id: string;
+  slug: string;
+  title: string;
+  is_published: boolean;
+  is_open: boolean;
+  config: EventConfig;
+  created_at: string;
+};
+
+export type Status = "pending" | "confirmed" | "rejected";
+
+export type Answers = Record<string, string | boolean>;
+export type Attendee = { item: string; answers: Answers }; // item = FeeItem id
+
+export type Registration = {
+  id: string;
+  event_id: string;
+  ref_code: string;
+  answers: Answers;
+  fees: Record<string, number>;
+  attendees: Attendee[];
+  checkin: Record<string, string>; // delegate index (or "main") -> check-in time
+  total: number;
+  receipt_path: string | null;
+  status: Status;
+  admin_note: string | null;
+  created_at: string;
+};
