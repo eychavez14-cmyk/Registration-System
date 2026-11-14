@@ -322,6 +322,25 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
                   {!changes.length && !reg.pending_change.receipt_path && <tr><td colSpan={3} className="py-1 text-slate-500">No visible differences.</td></tr>}
                 </tbody>
               </table>
+              {reg.pending_change.receipt_path && (
+                // Side by side so staff can judge the new receipt before approving.
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {[["Current receipt", reg.receipt_path, receipt], ["New receipt (requested)", reg.pending_change.receipt_path, newReceipt]].map(([label, path, url]) => (
+                    <div key={label} className="rounded-lg border border-purple-200 bg-white p-2">
+                      <p className="mb-1 text-xs font-bold text-purple-900">{label}</p>
+                      {!path ? <p className="text-xs text-slate-500">None</p>
+                        : !url ? <p className="text-xs text-slate-500">Loading…</p>
+                        : path.endsWith(".pdf") ? <a href={url} target="_blank" rel="noreferrer" className="text-sm text-purple-800 underline">📄 Open PDF</a>
+                        : (
+                          <a href={url} target="_blank" rel="noreferrer" title="Open full size">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt={label!} className="max-h-64 w-full rounded-md object-contain" />
+                          </a>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="mt-2 flex gap-2">
                 <button disabled={busy} onClick={() => decide("approve")} className="rounded-lg bg-purple-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Approve changes</button>
                 <button disabled={busy} onClick={() => decide("reject")} className={btn}>Reject changes</button>
