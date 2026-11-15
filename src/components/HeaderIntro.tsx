@@ -3,11 +3,14 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 const MOVE_MS = 900; // header content: centre -> top
-const LOGO_MS = 800; // loading logo: screen centre -> its place in the intro
+const LOADER_MIN_MS = 1500; // loading screen stays at least this long (from page open)
+// Mechanical logo motion: straight constant-speed slide, dead stop, short lock pause, then a firm snap to size.
+const SLIDE_MS = 450, LOCK_MS = 80, SNAP_MS = 270;
+const LOGO_MS = SLIDE_MS + LOCK_MS + SNAP_MS; // 800
 
 // Opening animation, in two phases (FLIP: measure where things end up, animate from where they start):
 //  A. Loading screen: the first logo centred on `loaderBg` (already in the server HTML, so it shows instantly).
-//     When ready, the logo glides to its spot in the centred intro while the event name/date fade in.
+//     After 1.5s (and once ready) the logo slides, locks and snaps into its spot in the centred intro.
 //  B. After `seconds`, the header content glides up into the header and the cover fades to reveal the form.
 export function HeaderIntro({ seconds, coverColor, cover, loaderBg, logo, children }: {
   seconds: number; coverColor: string; cover: ReactNode; loaderBg: string; logo?: string; children: ReactNode;
@@ -72,23 +75,32 @@ export function HeaderIntro({ seconds, coverColor, cover, loaderBg, logo, childr
     el.style.opacity = "0";
     if (target && ll) target.style.visibility = "hidden"; // the flying logo stands in for it until it lands
 
-    // Phase A, once the logo images can be measured (never wait more than 1.5s).
-    const ready = Promise.race([
+    // Phase A starts once the loading screen has shown for LOADER_MIN_MS (performance.now() counts from page open)
+    // and the logo images can be measured (but never waits more than 1.5s longer for slow images).
+    const minShown = new Promise((res) => setTimeout(res, Math.max(0, LOADER_MIN_MS - performance.now())));
+    const imagesReady = Promise.race([
       Promise.all([ll, target].map((img) => img?.decode().catch(() => null))),
-      new Promise((res) => setTimeout(res, 1500)),
+      new Promise((res) => setTimeout(res, LOADER_MIN_MS)),
     ]);
-    ready.then(() => requestAnimationFrame(() => {
+    Promise.all([minShown, imagesReady]).then(() => requestAnimationFrame(() => {
       if (cancelled || moved) return;
-      el.style.transition = "opacity 700ms ease 200ms";
-      el.style.opacity = "1";
       const fade = ld.firstElementChild as HTMLElement; // the coloured layer behind the logo
-      fade.style.transition = "opacity 600ms ease";
+      fade.style.transition = `opacity ${SLIDE_MS}ms linear`;
       fade.style.opacity = "0";
+      // Event name/date appear as the logo locks into place.
+      el.style.transition = `opacity 500ms ease ${SLIDE_MS}ms`;
+      el.style.opacity = "1";
       if (ll && target) {
+        // Centre-to-centre slide, then scale about the centre: two separate, machine-like motions.
         const from = ll.getBoundingClientRect(), to = target.getBoundingClientRect();
-        ll.style.transition = `transform ${LOGO_MS}ms cubic-bezier(.65,0,.35,1)`;
-        ll.style.transformOrigin = "top left";
-        ll.style.transform = `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${to.width / from.width}, ${to.height / from.height})`;
+        const slide = `translate(${to.left + to.width / 2 - (from.left + from.width / 2)}px, ${to.top + to.height / 2 - (from.top + from.height / 2)}px)`;
+        ll.style.transformOrigin = "center";
+        ll.style.transition = `transform ${SLIDE_MS}ms linear`;
+        ll.style.transform = slide;
+        timers.push(setTimeout(() => {
+          ll.style.transition = `transform ${SNAP_MS}ms cubic-bezier(.7,0,1,1)`; // accelerate into a hard stop
+          ll.style.transform = `${slide} scale(${to.width / from.width})`;
+        }, SLIDE_MS + LOCK_MS));
       }
       timers.push(setTimeout(hideLoader, LOGO_MS + 50));
       timers.push(setTimeout(move, LOGO_MS + Math.max(1, seconds) * 1000)); // Phase B
@@ -108,7 +120,7 @@ export function HeaderIntro({ seconds, coverColor, cover, loaderBg, logo, childr
       <div ref={loader} aria-hidden className="intro-loader fixed inset-0 z-[80] flex cursor-pointer items-center justify-center">
         <div className="absolute inset-0" style={{ backgroundColor: loaderBg }} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        {logo && <img ref={loaderLogo} src={logo} alt="" className="relative h-28 w-auto object-contain sm:h-36" />}
+        {logo && <img ref={loaderLogo} src={logo} alt="" className="relative h-[336px] max-h-[60vh] w-auto max-w-[90vw] object-contain sm:h-[432px]" />}
       </div>
     </>
   );
