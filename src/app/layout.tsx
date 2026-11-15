@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+// preload: false — event pages use their own font, so they shouldn't download Inter (the admin still uses it).
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], preload: false });
 
 export const metadata: Metadata = {
   title: "Event Registration",

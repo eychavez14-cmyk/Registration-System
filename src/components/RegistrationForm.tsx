@@ -4,10 +4,8 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import type { Answers, Attendee, EventRow, Field } from "@/lib/types";
 import { attendeeSlots, money, validateSubmission } from "@/lib/validate";
-import { browserDb } from "@/lib/supabase/browser";
 import { shrinkImage } from "@/lib/shrink";
 import { registrationSummary } from "@/lib/summary";
-import { summaryPng } from "@/lib/summaryImage";
 import { QrCode } from "./QrCode";
 
 export type Done = { ref_code: string; total: number; answers: Answers; fees: Record<string, number>; attendees: Attendee[]; at: string; emailedTo: string | null };
@@ -129,6 +127,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
       setSaving(true);
       setMessage("");
       try {
+        const { summaryPng } = await import("@/lib/summaryImage"); // loaded only when needed (keeps the form light)
         const blob = await summaryPng({ title: event.title, config, refCode: done.ref_code, date: done.at, groups, statusUrl: location.origin + statusPath });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
@@ -228,6 +227,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
         const res = await fetch("/api/upload-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: event.slug, type: file.type, size: file.size }) });
         const up = await res.json();
         if (!res.ok) throw new Error(up.error);
+        const { browserDb } = await import("@/lib/supabase/browser"); // Supabase client only downloads when a receipt is uploaded
         const { error } = await browserDb().storage.from("receipts").uploadToSignedUrl(up.path, up.token, file, { contentType: file.type });
         if (error) throw new Error("Receipt upload failed, please try again");
         receiptPath = up.path;

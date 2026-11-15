@@ -1,8 +1,9 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import type { EventRow } from "@/lib/types";
 import { HeaderIntro } from "./HeaderIntro";
-import { isVideo } from "@/lib/media";
+import { isVideo, skipOptimize } from "@/lib/media";
 
 // Themed page frame shared by the form, the status page and the admin live preview.
 // intro: play the opening animation (registration form page only, if enabled for the event).
@@ -18,8 +19,8 @@ export function EventShell({ event, tab, children, intro }: { event: Pick<EventR
       {theme.logoUrls.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-center gap-4">
           {theme.logoUrls.map((src) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt="" className="h-14 sm:h-20 w-auto object-contain" />
+            // width/height only set the shape until it loads; sizes = largest it's shown (intro, scaled up) at 2x
+            <Image key={src} src={src} alt="" width={240} height={240} sizes="240px" unoptimized={skipOptimize(src)} className="h-14 sm:h-20 w-auto object-contain" />
           ))}
         </div>
       )}
@@ -35,7 +36,7 @@ export function EventShell({ event, tab, children, intro }: { event: Pick<EventR
       {isVideo(theme.bannerUrl) ? (
         <video src={theme.bannerUrl} autoPlay muted loop playsInline aria-hidden className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: bannerPos }} />
       ) : (
-        <div aria-hidden className="absolute inset-0 bg-cover" style={{ backgroundImage: `url("${theme.bannerUrl}")`, backgroundPosition: bannerPos }} />
+        <Image src={theme.bannerUrl} alt="" aria-hidden fill preload sizes="100vw" unoptimized={skipOptimize(theme.bannerUrl)} className="object-cover" style={{ objectPosition: bannerPos }} />
       )}
       <div aria-hidden className="absolute inset-0" style={{ backgroundColor: theme.overlayColor, opacity: theme.overlayOpacity / 100 }} />
     </>

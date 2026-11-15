@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { skipOptimize } from "@/lib/media";
 
 const MOVE_MS = 900; // header content: centre -> top
 const LOADER_MIN_MS = 1000; // loading screen stays at least this long (from page open)
@@ -115,8 +117,7 @@ export function HeaderIntro({ seconds, coverColor, cover, logo, children }: {
       <div ref={content} className="intro-content relative z-[70] mx-auto w-fit max-w-full">{children}</div>
       {/* Loading screen: just the logo, over the banner cover beneath (both in the server HTML, so they show instantly). */}
       <div ref={loader} aria-hidden className="intro-loader fixed inset-0 z-[80] flex cursor-pointer items-center justify-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {logo && <img ref={loaderLogo} src={logo} alt="" className="relative h-[336px] max-h-[60vh] w-auto max-w-[90vw] object-contain sm:h-[432px]" />}
+        {logo && <Image ref={loaderLogo} src={logo} alt="" width={432} height={432} preload sizes="(min-width: 640px) 432px, 336px" unoptimized={skipOptimize(logo)} className="relative h-[336px] max-h-[60vh] w-auto max-w-[90vw] object-contain sm:h-[432px]" />}
       </div>
     </>
   );

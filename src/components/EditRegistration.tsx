@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { Answers, Attendee, EventConfig } from "@/lib/types";
 import { attendeeSlots, validateSubmission } from "@/lib/validate";
 import { FieldInput, inputClass } from "./RegistrationForm";
-import { browserDb } from "@/lib/supabase/browser";
 import { shrinkImage } from "@/lib/shrink";
 
 // Registrant edits their own answers. Step 1 proves who they are; step 2 edits; changes wait for staff approval.
@@ -71,6 +70,7 @@ export function EditRegistration({ slug, code, config, onDone }: { slug: string;
         setBusy(true);
         const res = await fetch("/api/upload-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug, type: file.type, size: file.size }) }).catch(() => null);
         const up = res ? await res.json() : { error: "Network error, please try again" };
+        const { browserDb } = await import("@/lib/supabase/browser"); // only needed when a file is uploaded
         const sent = res?.ok && !(await browserDb().storage.from("receipts").uploadToSignedUrl(up.path, up.token, file, { contentType: file.type })).error;
         setBusy(false);
         if (!sent) return setMsg({ ok: false, text: res?.ok ? "Receipt upload failed, please try again." : up.error });
