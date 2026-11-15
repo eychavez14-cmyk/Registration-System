@@ -262,37 +262,26 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
         ))}
         {feeCfg.enabled && (
           <Card title={feeCfg.title}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                    <th className="py-2 pr-2 font-semibold">Category</th>
-                    <th className="py-2 px-2 font-semibold">Fee</th>
-                    <th className="py-2 px-2 font-semibold text-center">Quantity</th>
-                    <th className="py-2 pl-2 font-semibold text-right">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {feeCfg.items.map((i) => (
-                    <tr key={i.id} className="border-b border-slate-100 last:border-0">
-                      <td className="py-3 pr-2">
-                        <span className="font-medium">{i.label}</span>
-                        {i.description?.trim() && <span className="mt-0.5 block whitespace-pre-line text-xs text-slate-500">{i.description}</span>}
-                      </td>
-                      <td className="py-3 px-2 text-slate-600">{money(feeCfg.currency, i.price)}</td>
-                      <td className="py-3 px-2">
-                        <div className="mx-auto flex w-fit items-center rounded-lg border border-slate-300">
-                          <button type="button" aria-label={`Fewer ${i.label}`} onClick={() => setQ(i.id, (qty[i.id] ?? 0) - 1)} className="px-3 py-1.5 text-slate-500 hover:text-slate-900">−</button>
-                          <input aria-label={`${i.label} quantity`} inputMode="numeric" value={qty[i.id] ?? 0} onChange={(e) => setQ(i.id, Number(e.target.value))} className="w-10 text-center outline-none" />
-                          <button type="button" aria-label={`More ${i.label}`} onClick={() => setQ(i.id, (qty[i.id] ?? 0) + 1)} className="px-3 py-1.5 text-slate-500 hover:text-slate-900">+</button>
-                        </div>
-                      </td>
-                      <td className="py-3 pl-2 text-right font-semibold">{money(feeCfg.currency, (qty[i.id] ?? 0) * i.price)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* Rows instead of a table: on narrow phones the stepper wraps under the name rather than scrolling sideways. */}
+            <ul className="divide-y divide-slate-100 text-sm">
+              {feeCfg.items.map((i) => (
+                <li key={i.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
+                  <div className="min-w-0 flex-1 basis-40">
+                    <p className="font-semibold">{i.label}</p>
+                    {i.description?.trim() && <p className="mt-0.5 whitespace-pre-line text-xs text-slate-500">{i.description}</p>}
+                    <p className="mt-0.5 text-slate-600">{money(feeCfg.currency, i.price)} each</p>
+                  </div>
+                  <div className="ml-auto flex items-center gap-3">
+                    <div className="flex items-center rounded-lg border border-slate-300">
+                      <button type="button" aria-label={`Fewer ${i.label}`} onClick={() => setQ(i.id, (qty[i.id] ?? 0) - 1)} className="px-3.5 py-2 text-lg leading-none text-slate-500 hover:text-slate-900">−</button>
+                      <input aria-label={`${i.label} quantity`} inputMode="numeric" value={qty[i.id] ?? 0} onChange={(e) => setQ(i.id, Number(e.target.value))} className="w-10 text-center outline-none" />
+                      <button type="button" aria-label={`More ${i.label}`} onClick={() => setQ(i.id, (qty[i.id] ?? 0) + 1)} className="px-3.5 py-2 text-lg leading-none text-slate-500 hover:text-slate-900">+</button>
+                    </div>
+                    <span className="w-24 text-right font-semibold">{money(feeCfg.currency, (qty[i.id] ?? 0) * i.price)}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
             {errors.fees && <p className="field-error mt-2 text-xs text-red-600">{errors.fees}</p>}
           </Card>
         )}
