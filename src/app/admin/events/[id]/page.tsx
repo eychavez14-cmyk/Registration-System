@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { browserDb } from "@/lib/supabase/browser";
+import { authFetch, browserDb } from "@/lib/supabase/browser";
 import { withDefaults } from "@/lib/defaults";
 import { useRole } from "@/components/admin/AdminGate";
 import type { EventConfig, EventRow, Field } from "@/lib/types";
@@ -72,10 +72,15 @@ export default function EventEditor() {
     if (error) return setMsg(error.code === "23505" ? "That link is already used by another event." : error.code === "23514" ? "Link can only use lowercase letters, numbers and dashes." : error.message);
     // No row back = the event was deleted (e.g. in another tab) or the session lost admin access.
     if (!data) return setMsg("This event no longer exists or you're signed out. Go back to All events.");
+    // Refresh the public page cache (old link too, in case it was renamed) so visitors see the change now.
+    const refreshed = await refreshPublicPage([saved!.slug, data.slug]);
     setSaved({ ...data, config: withDefaults(data.config) });
     setDraft({ ...data, config: withDefaults(data.config) });
-    setMsg("Saved ✓");
+    setMsg(refreshed ? "Saved ✓" : "Saved ✓ (the public page may take up to an hour to update)");
   }
+
+  const refreshPublicPage = (slugs: string[]) =>
+    authFetch("/api/revalidate", { method: "POST", body: JSON.stringify({ slugs }) }).then((r) => r.ok, () => false);
 
   async function remove() {
     const db = browserDb();
@@ -86,6 +91,7 @@ export default function EventEditor() {
       const { data } = await db.storage.from(bucket).list(id, { limit: 1000 });
       if (data?.length) await db.storage.from(bucket).remove(data.map((f) => `${id}/${f.name}`));
     }
+    await refreshPublicPage([saved!.slug]);
     router.replace("/admin");
   }
 

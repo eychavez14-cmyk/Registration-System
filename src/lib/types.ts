@@ -20,7 +20,7 @@ export type FeeItem = { id: string; label: string; price: number; description?: 
 
 export type EventConfig = {
   header: { subtitle: string; venue: string };
-  intro: { enabled: boolean; seconds: number }; // opening animation on the registration form
+  intro: { enabled: boolean; seconds: number; loaderBg: string }; // opening animation; loaderBg = color behind the logo while the page loads
   theme: {
     primary: string;
     headerBg: string;

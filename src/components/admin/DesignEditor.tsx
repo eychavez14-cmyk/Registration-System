@@ -49,6 +49,12 @@ export function DesignEditor({ eventId, config, onChange }: { eventId: string; c
             <span className="text-slate-600">seconds</span>
           </label>
         )}
+        {config.intro.enabled && (
+          <>
+            <Color label="Loading screen color (behind your logo while the page opens)" value={config.intro.loaderBg} onChange={(loaderBg) => onChange({ ...config, intro: { ...config.intro, loaderBg } })} />
+            {!theme.logoUrls.length && <p className="text-xs text-amber-700">Add a logo under Images to show it on the loading screen.</p>}
+          </>
+        )}
         <p className="text-xs text-slate-500">The preview here doesn&apos;t play it. Save, then use <b>Open form ↗</b> to watch it.</p>
       </Panel>
       <Panel title="Header text">

@@ -8,13 +8,13 @@
 @keyframes intro-reveal { to { opacity: 1; } }
 @keyframes intro-hide { to { opacity: 0; visibility: hidden; } }
 .intro-content { opacity: 0; animation: intro-reveal 0.3s 4s forwards; }
-.intro-backdrop { animation: intro-hide 0.3s 4s forwards; }
+.intro-backdrop, .intro-loader { animation: intro-hide 0.3s 4s forwards; }
 @media (prefers-reduced-motion: reduce) {
   .intro-content { opacity: 1; animation: none; }
-  .intro-backdrop { display: none; }
+  .intro-backdrop, .intro-loader { display: none; }
 }
 @media print {
-  .intro-backdrop { display: none; }
+  .intro-backdrop, .intro-loader { display: none; }
   .intro-content { opacity: 1; }
 }
 
