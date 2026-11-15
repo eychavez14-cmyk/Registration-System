@@ -53,7 +53,7 @@ export function EventShell({ event, tab, children, intro }: { event: Pick<EventR
         {bannerLayers}
         <div className="relative mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-12 text-center">
           {intro && event.config.intro.enabled ? (
-            <HeaderIntro seconds={event.config.intro.seconds} coverColor={theme.headerBg} cover={bannerLayers} loaderBg={event.config.intro.loaderBg} logo={theme.logoUrls[0]}>{headerContent}</HeaderIntro>
+            <HeaderIntro seconds={event.config.intro.seconds} coverColor={theme.headerBg} cover={bannerLayers} logo={theme.logoUrls[0]}>{headerContent}</HeaderIntro>
           ) : (
             headerContent
           )}

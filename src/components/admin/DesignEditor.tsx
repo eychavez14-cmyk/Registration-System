@@ -45,16 +45,11 @@ export function DesignEditor({ eventId, config, onChange }: { eventId: string; c
         {config.intro.enabled && (
           <label className="flex items-center gap-2 text-sm">
             <span className="font-medium text-slate-700">Show in the middle for</span>
-            <input type="number" min={1} max={8} step={0.5} value={config.intro.seconds} onChange={(e) => onChange({ ...config, intro: { ...config.intro, seconds: Math.min(8, Math.max(1, Number(e.target.value) || 3)) } })} className={`${input} max-w-20`} />
+            <input type="number" min={1} max={8} step={0.5} value={config.intro.seconds} onChange={(e) => onChange({ ...config, intro: { ...config.intro, seconds: Math.min(8, Math.max(1, Number(e.target.value) || 1)) } })} className={`${input} max-w-20`} />
             <span className="text-slate-600">seconds</span>
           </label>
         )}
-        {config.intro.enabled && (
-          <>
-            <Color label="Loading screen color (behind your logo while the page opens)" value={config.intro.loaderBg} onChange={(loaderBg) => onChange({ ...config, intro: { ...config.intro, loaderBg } })} />
-            {!theme.logoUrls.length && <p className="text-xs text-amber-700">Add a logo under Images to show it on the loading screen.</p>}
-          </>
-        )}
+        {config.intro.enabled && !theme.logoUrls.length && <p className="text-xs text-amber-700">Add a logo under Images to show it on the loading screen.</p>}
         <p className="text-xs text-slate-500">The preview here doesn&apos;t play it. Save, then use <b>Open form ↗</b> to watch it.</p>
       </Panel>
       <Panel title="Header text">

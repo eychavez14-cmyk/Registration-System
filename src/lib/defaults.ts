@@ -7,7 +7,7 @@ export const newId = () => Math.random().toString(36).slice(2, 10);
 // Starting point for every new event; mirrors a typical church conference form.
 export const defaultConfig = (): EventConfig => ({
   header: { subtitle: "November 21, 2026 • 8 AM - 4 PM", venue: "Venue name, City" },
-  intro: { enabled: true, seconds: 1.5, loaderBg: "#000000" },
+  intro: { enabled: true, seconds: 1 },
   theme: {
     primary: "#2563eb",
     headerBg: "#0f172a",

@@ -3,17 +3,17 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 const MOVE_MS = 900; // header content: centre -> top
-const LOADER_MIN_MS = 1500; // loading screen stays at least this long (from page open)
+const LOADER_MIN_MS = 1000; // loading screen stays at least this long (from page open)
 // Mechanical logo motion: straight constant-speed slide, dead stop, short lock pause, then a firm snap to size.
-const SLIDE_MS = 450, LOCK_MS = 80, SNAP_MS = 270;
-const LOGO_MS = SLIDE_MS + LOCK_MS + SNAP_MS; // 800
+const SLIDE_MS = 560, LOCK_MS = 100, SNAP_MS = 340;
+const LOGO_MS = SLIDE_MS + LOCK_MS + SNAP_MS; // 1000
 
 // Opening animation, in two phases (FLIP: measure where things end up, animate from where they start):
-//  A. Loading screen: the first logo centred on `loaderBg` (already in the server HTML, so it shows instantly).
-//     After 1.5s (and once ready) the logo slides, locks and snaps into its spot in the centred intro.
+//  A. Loading screen: the first logo centred over the banner (already in the server HTML, so it shows instantly).
+//     After 1s (and once ready) the logo slides, locks and snaps into its spot in the centred intro.
 //  B. After `seconds`, the header content glides up into the header and the cover fades to reveal the form.
-export function HeaderIntro({ seconds, coverColor, cover, loaderBg, logo, children }: {
-  seconds: number; coverColor: string; cover: ReactNode; loaderBg: string; logo?: string; children: ReactNode;
+export function HeaderIntro({ seconds, coverColor, cover, logo, children }: {
+  seconds: number; coverColor: string; cover: ReactNode; logo?: string; children: ReactNode;
 }) {
   const content = useRef<HTMLDivElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
@@ -84,11 +84,8 @@ export function HeaderIntro({ seconds, coverColor, cover, loaderBg, logo, childr
     ]);
     Promise.all([minShown, imagesReady]).then(() => requestAnimationFrame(() => {
       if (cancelled || moved) return;
-      const fade = ld.firstElementChild as HTMLElement; // the coloured layer behind the logo
-      fade.style.transition = `opacity ${SLIDE_MS}ms linear`;
-      fade.style.opacity = "0";
-      // Event name/date appear as the logo locks into place.
-      el.style.transition = `opacity 500ms ease ${SLIDE_MS}ms`;
+      // Event name/date appear only as the logo snaps into place (not underneath the big flying logo).
+      el.style.transition = `opacity 350ms ease ${LOGO_MS - 150}ms`;
       el.style.opacity = "1";
       if (ll && target) {
         // Centre-to-centre slide, then scale about the centre: two separate, machine-like motions.
@@ -116,9 +113,8 @@ export function HeaderIntro({ seconds, coverColor, cover, loaderBg, logo, childr
     <>
       <div ref={backdrop} aria-hidden className="intro-backdrop fixed inset-0 z-[60] cursor-pointer" style={{ backgroundColor: coverColor }}>{cover}</div>
       <div ref={content} className="intro-content relative z-[70] mx-auto w-fit max-w-full">{children}</div>
-      {/* Loading screen: in the server HTML, so it's the first thing visitors see. */}
+      {/* Loading screen: just the logo, over the banner cover beneath (both in the server HTML, so they show instantly). */}
       <div ref={loader} aria-hidden className="intro-loader fixed inset-0 z-[80] flex cursor-pointer items-center justify-center">
-        <div className="absolute inset-0" style={{ backgroundColor: loaderBg }} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {logo && <img ref={loaderLogo} src={logo} alt="" className="relative h-[336px] max-h-[60vh] w-auto max-w-[90vw] object-contain sm:h-[432px]" />}
       </div>
