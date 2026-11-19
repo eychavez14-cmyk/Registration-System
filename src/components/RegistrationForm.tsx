@@ -6,6 +6,7 @@ import type { Answers, Attendee, EventRow, Field } from "@/lib/types";
 import { attendeeSlots, money, validateSubmission } from "@/lib/validate";
 import { shrinkImage } from "@/lib/shrink";
 import { registrationSummary } from "@/lib/summary";
+import { isShown, priceOf, shownIds, visibleAnswers } from "@/lib/rules";
 import { QrCode } from "./QrCode";
 
 export type Done = { ref_code: string; total: number; answers: Answers; fees: Record<string, number>; attendees: Attendee[]; at: string; emailedTo: string | null };
@@ -98,10 +99,15 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState<"" | "yes" | "failed">("");
 
-  const total = feeCfg.enabled ? feeCfg.items.reduce((s, i) => s + (qty[i.id] ?? 0) * i.price, 0) : 0;
+  // Conditional logic: questions hidden by an earlier answer, and special prices by answer (server recomputes both).
+  const shown = shownIds(config, answers);
+  const vis = visibleAnswers(config, answers);
+  const price = (i: (typeof feeCfg.items)[number]) => priceOf(config, i, vis);
+  const total = feeCfg.enabled ? feeCfg.items.reduce((s, i) => s + (qty[i.id] ?? 0) * price(i), 0) : 0;
   const count = feeCfg.enabled ? feeCfg.items.reduce((s, i) => s + (qty[i.id] ?? 0), 0) : 0;
+  const free = count > 0 && total === 0; // nothing to pay: no payment instructions or receipt
   const slots = attendeeSlots(config, qty);
-  const needsProof =payment.enabled && payment.requireProof && total > 0;
+  const needsProof = payment.enabled && payment.requireProof && total > 0;
   const setQ = (id: string, n: number) => setQty((q) => ({ ...q, [id]: Math.max(0, Math.min(500, Math.floor(n) || 0)) }));
   // The QR lives on another domain (Supabase), where a plain download link just opens it, so fetch it as a file first.
   const downloadPaymentQr = async () => {
@@ -223,7 +229,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
     setBusy(true);
     try {
       let receiptPath: string | null = null;
-      if (file && payment.enabled) {
+      if (file && payment.enabled && !free) {
         const res = await fetch("/api/upload-url", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: event.slug, type: file.type, size: file.size }) });
         const up = await res.json();
         if (!res.ok) throw new Error(up.error);
@@ -254,7 +260,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
           <Card key={s.id} title={s.title}>
             {s.description?.trim() && <p className="-mt-2 mb-4 whitespace-pre-line text-sm text-slate-600">{s.description}</p>}
             <div className="grid gap-4 @xl:grid-cols-2">
-              {s.fields.map((f) => (
+              {s.fields.filter((f) => shown.has(f.id)).map((f) => (
                 <FieldInput key={f.id} field={f} value={answers[f.id]} error={errors[f.id]} onChange={(v) => setAnswers((a) => ({ ...a, [f.id]: v }))} />
               ))}
             </div>
@@ -269,7 +275,10 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
                   <div className="min-w-0 flex-1 basis-40">
                     <p className="font-semibold">{i.label}</p>
                     {i.description?.trim() && <p className="mt-0.5 whitespace-pre-line text-xs text-slate-500">{i.description}</p>}
-                    <p className="mt-0.5 text-slate-600">{money(feeCfg.currency, i.price)} each</p>
+                    <p className="mt-0.5 text-slate-600">
+                      {price(i) !== i.price && <s className="mr-1.5 text-slate-400">{money(feeCfg.currency, i.price)}</s>}
+                      {price(i) === 0 && i.price > 0 ? <b className="text-green-700">FREE</b> : <>{money(feeCfg.currency, price(i))} each</>}
+                    </p>
                   </div>
                   <div className="ml-auto flex items-center gap-3">
                     <div className="flex items-center rounded-lg border border-slate-300">
@@ -277,7 +286,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
                       <input aria-label={`${i.label} quantity`} inputMode="numeric" value={qty[i.id] ?? 0} onChange={(e) => setQ(i.id, Number(e.target.value))} className="w-10 text-center outline-none" />
                       <button type="button" aria-label={`More ${i.label}`} onClick={() => setQ(i.id, (qty[i.id] ?? 0) + 1)} className="px-3.5 py-2 text-lg leading-none text-slate-500 hover:text-slate-900">+</button>
                     </div>
-                    <span className="w-24 text-right font-semibold">{money(feeCfg.currency, (qty[i.id] ?? 0) * i.price)}</span>
+                    <span className="w-24 text-right font-semibold">{money(feeCfg.currency, (qty[i.id] ?? 0) * price(i))}</span>
                   </div>
                 </li>
               ))}
@@ -294,7 +303,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
                   <fieldset key={key} className="rounded-xl border border-slate-200 p-4">
                     <legend className="px-1 text-sm font-bold text-slate-700">{item.label} #{n}</legend>
                     <div className="grid gap-4 @xl:grid-cols-2">
-                      {config.attendees.fields.map((f) => (
+                      {config.attendees.fields.filter((f) => isShown(config, f, vis)).map((f) => (
                         <FieldInput key={f.id} field={f} name={`att-${i}-${f.id}`} value={att[key]?.[f.id]} error={errors[`att:${i}:${f.id}`]}
                           onChange={(v) => setAtt((a) => ({ ...a, [key]: { ...a[key], [f.id]: v } }))} />
                       ))}
@@ -314,7 +323,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
               <h2 className="text-lg font-bold">Payment Summary</h2>
               <div className="mt-3 space-y-1 text-sm">
                 {feeCfg.items.filter((i) => qty[i.id]).map((i) => (
-                  <div key={i.id} className="flex justify-between text-slate-600"><span>{i.label} × {qty[i.id]}</span><span>{money(feeCfg.currency, qty[i.id] * i.price)}</span></div>
+                  <div key={i.id} className="flex justify-between text-slate-600"><span>{i.label} × {qty[i.id]}</span><span>{money(feeCfg.currency, qty[i.id] * price(i))}</span></div>
                 ))}
                 <div className="flex justify-between text-slate-600"><span>Total items ({count})</span><span>{money(feeCfg.currency, total)}</span></div>
               </div>
@@ -325,7 +334,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
             </>
           )}
 
-          {payment.enabled && (
+          {payment.enabled && !free && (
             <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
               <p className="text-xs font-bold uppercase tracking-wide text-[var(--primary)]">Payment Instructions</p>
               <p className="mt-2 whitespace-pre-line text-slate-600">{payment.instructions}</p>
@@ -345,7 +354,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
             </div>
           )}
 
-          {payment.enabled && (payment.requireProof || total > 0) && (
+          {payment.enabled && !free && (payment.requireProof || total > 0) && (
             <div className="mt-5">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Proof of Payment {needsProof && <span className="text-red-500">*</span>}</p>
               {payment.proofNote && <p className="mt-1 text-xs text-amber-700">⚠️ {payment.proofNote}</p>}

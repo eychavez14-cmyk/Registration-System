@@ -1,5 +1,6 @@
 import type { Answers, Attendee, EventConfig } from "./types";
 import { money } from "./validate.ts";
+import { priceOf } from "./rules.ts";
 
 export type SummaryGroup = { title: string; rows: [label: string, value: string][] };
 type Submitted = { answers: Answers; fees: Record<string, number>; attendees: Attendee[]; total: number };
@@ -30,7 +31,7 @@ export function registrationSummary(config: EventConfig, r: Submitted): SummaryG
     groups.push({
       title: "Payment",
       rows: [
-        ...config.fees.items.filter((i) => r.fees[i.id]).map((i): [string, string] => [`${i.label} × ${r.fees[i.id]}`, money(cur, r.fees[i.id] * i.price)]),
+        ...config.fees.items.filter((i) => r.fees[i.id]).map((i): [string, string] => [`${i.label} × ${r.fees[i.id]}`, money(cur, r.fees[i.id] * priceOf(config, i, r.answers))]),
         ["Total", money(cur, r.total)],
       ],
     });

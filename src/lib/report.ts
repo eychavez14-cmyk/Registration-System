@@ -1,4 +1,5 @@
 import type { Answers, EventConfig, Field, Registration, Status } from "./types";
+import { priceOf } from "./rules.ts";
 
 // One "line" per person (or per category when there are no delegate details): the unit the dashboard
 // statistics, filters and the report all count, so they always agree.
@@ -35,7 +36,7 @@ export function buildLines(config: EventConfig, regs: Registration[]): Line[] {
       lines = [{ reg, categoryId: "", category: "—", qty: 1, person: name, personAnswers: {}, key: "main" }];
     }
     // Split the real amount paid by current prices, so the lines always add up to reg.total even if prices changed later.
-    const weights = lines.map((l) => (items.get(l.categoryId)?.price ?? 0) * l.qty);
+    const weights = lines.map((l) => { const it = items.get(l.categoryId); return (it ? priceOf(config, it, reg.answers) : 0) * l.qty; });
     const sum = weights.reduce((s, w) => s + w, 0);
     const total = Number(reg.total) || 0;
     return lines.map((l, i) => ({ ...l, amount: Math.round((sum ? (total * weights[i]) / sum : total / lines.length) * 100) / 100 }));

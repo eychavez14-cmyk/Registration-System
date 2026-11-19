@@ -1,6 +1,7 @@
 "use client";
 
-import { FIELD_TYPES, type EventConfig, type Field, type Section } from "@/lib/types";
+import { FIELD_TYPES, type Condition, type EventConfig, type Field, type Section } from "@/lib/types";
+import { ruleSources } from "@/lib/rules";
 import { newId } from "@/lib/defaults";
 import { btn, btnDanger, ConfirmButton, input, move, Panel, Text, Toggle } from "./ui";
 
@@ -9,8 +10,38 @@ const TYPE_LABEL: Record<Field["type"], string> = {
   select: "Dropdown", radio: "Multiple choice", checkbox: "Checkbox", date: "Date",
 };
 
+// "When the answer to <question> is any of <options>". Used for show-only-when and for special prices.
+export function ConditionEditor({ label, sources, value, onChange, noneLabel }: { label: string; sources: Field[]; value?: Condition; onChange: (c?: Condition) => void; noneLabel?: string }) {
+  const src = sources.find((f) => f.id === value?.fieldId);
+  return (
+    <div className="text-sm">
+      <label className="block">
+        <span className="mb-1 block font-medium text-slate-700">{label}</span>
+        <select className={input} value={value?.fieldId ?? ""} onChange={(e) => onChange(e.target.value ? { fieldId: e.target.value, values: [] } : undefined)}>
+          {noneLabel && <option value="">{noneLabel}</option>}
+          {value && !src && <option value={value.fieldId}>(question removed: rule is ignored)</option>}
+          {sources.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+        </select>
+      </label>
+      {src && value && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="text-slate-500">is any of:</span>
+          {(src.options ?? []).map((o) => (
+            <label key={o} className="flex items-center gap-1.5">
+              <input type="checkbox" checked={value.values.includes(o)} onChange={(e) => onChange({ ...value, values: e.target.checked ? [...value.values, o] : value.values.filter((v) => v !== o) })} />
+              {o}
+            </label>
+          ))}
+          {!value.values.length && <span className="text-xs text-red-600">Tick at least one option</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Question list editor, used for form sections and for per-delegate questions.
-export function FieldsEditor({ fields, onChange }: { fields: Field[]; onChange: (f: Field[]) => void }) {
+// sourcesFor: the dropdown/multiple-choice questions this question's "Show only when" may depend on.
+export function FieldsEditor({ fields, onChange, sourcesFor }: { fields: Field[]; onChange: (f: Field[]) => void; sourcesFor: (f: Field) => Field[] }) {
   return (
     <>
       {fields.map((f, fi) => {
@@ -33,6 +64,10 @@ export function FieldsEditor({ fields, onChange }: { fields: Field[]; onChange: 
               <Text label="Options (one per line)" textarea value={(f.options ?? []).join("\n")}
                 onChange={(v) => setField({ options: v.split("\n").map((o) => o.trimStart()).filter((o, i, a) => o || i === a.length - 1) })} />
             )}
+            {(f.showIf || sourcesFor(f).length > 0) && (
+              <ConditionEditor label="Show this question" noneLabel="Always" sources={sourcesFor(f)} value={f.showIf}
+                onChange={(showIf) => setField({ showIf })} />
+            )}
             <div className="flex flex-wrap items-center gap-4">
               <Toggle label="Required" checked={f.required} onChange={(required) => setField({ required })} />
               <Toggle label="Half width" checked={!!f.half} onChange={(half) => setField({ half })} />
@@ -54,6 +89,7 @@ export function FieldsEditor({ fields, onChange }: { fields: Field[]; onChange: 
 export function FormBuilder({ config, onChange, hasRegistrations }: { config: EventConfig; onChange: (c: EventConfig) => void; hasRegistrations: boolean }) {
   const setSections = (sections: Section[]) => onChange({ ...config, sections });
   const setSection = (i: number, s: Section) => setSections(config.sections.map((x, j) => (j === i ? s : x)));
+  const all = config.sections.flatMap((s) => s.fields); // a question may only depend on questions above it
 
   return (
     <div className="space-y-4">
@@ -72,7 +108,7 @@ export function FormBuilder({ config, onChange, hasRegistrations }: { config: Ev
         >
           <Text label="Section title" value={s.title} onChange={(title) => setSection(si, { ...s, title })} />
           <Text label="Section description (optional)" textarea value={s.description ?? ""} onChange={(description) => setSection(si, { ...s, description })} />
-          <FieldsEditor fields={s.fields} onChange={(fields) => setSection(si, { ...s, fields })} />
+          <FieldsEditor fields={s.fields} onChange={(fields) => setSection(si, { ...s, fields })} sourcesFor={(f) => ruleSources(all.slice(0, all.findIndex((x) => x.id === f.id)))} />
         </Panel>
       ))}
       <button type="button" className={btn} onClick={() => setSections([...config.sections, { id: newId(), title: "New section", fields: [] }])}>+ Add section</button>

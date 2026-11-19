@@ -1,4 +1,5 @@
 import type { Answers, Attendee, EventConfig, Field } from "./types";
+import { isShown, priceOf } from "./rules.ts";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_QTY = 500;
@@ -14,10 +15,13 @@ export type Validated = {
 const asObject = (v: unknown) => (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
 
 // Checks one set of answers; errors are stored under prefix + field id.
-function checkFields(fields: Field[], raw: unknown, errors: Record<string, string>, prefix = ""): Answers {
+// Hidden questions (showIf not met) are skipped: not required, not saved. Conditions are checked against
+// `context` (the main answers, for delegates) or, for the main form, the answers validated so far.
+function checkFields(config: EventConfig, fields: Field[], raw: unknown, errors: Record<string, string>, prefix = "", context?: Answers): Answers {
   const inA = asObject(raw);
   const answers: Answers = {};
   for (const field of fields) {
+    if (!isShown(config, field, context ?? answers)) continue;
     const key = prefix + field.id;
     const v = inA[field.id];
     if (field.type === "checkbox") {
@@ -50,7 +54,7 @@ export const attendeeSlots = (config: EventConfig, fees: Record<string, number>)
 export function validateSubmission(config: EventConfig, rawAnswers: unknown, rawFees: unknown, rawAttendees?: unknown): Validated {
   const inF = asObject(rawFees);
   const errors: Record<string, string> = {};
-  const answers = checkFields(config.sections.flatMap((s) => s.fields), rawAnswers, errors);
+  const answers = checkFields(config, config.sections.flatMap((s) => s.fields), rawAnswers, errors);
 
   const fees: Record<string, number> = {};
   let total = 0;
@@ -62,7 +66,7 @@ export function validateSubmission(config: EventConfig, rawAnswers: unknown, raw
         continue;
       }
       if (q > 0) fees[item.id] = q;
-      total += q * item.price;
+      total += q * priceOf(config, item, answers);
     }
     if (Object.keys(fees).length === 0) errors.fees = "Add at least one item";
   }
@@ -70,7 +74,7 @@ export function validateSubmission(config: EventConfig, rawAnswers: unknown, raw
   const inAtt = Array.isArray(rawAttendees) ? rawAttendees : [];
   const attendees = attendeeSlots(config, fees).map(({ item }, i) => ({
     item: item.id,
-    answers: checkFields(config.attendees.fields, inAtt[i], errors, `att:${i}:`),
+    answers: checkFields(config, config.attendees.fields, inAtt[i], errors, `att:${i}:`, answers),
   }));
   return { errors, answers, fees, attendees, total: Math.round(total * 100) / 100 };
 }

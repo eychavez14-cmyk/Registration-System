@@ -5,6 +5,7 @@ import type { Answers, Attendee, EventConfig } from "@/lib/types";
 import { attendeeSlots, validateSubmission } from "@/lib/validate";
 import { FieldInput, inputClass } from "./RegistrationForm";
 import { shrinkImage } from "@/lib/shrink";
+import { isShown, shownIds, visibleAnswers } from "@/lib/rules";
 
 // Registrant edits their own answers. Step 1 proves who they are; step 2 edits; changes wait for staff approval.
 export function EditRegistration({ slug, code, config, onDone }: { slug: string; code: string; config: EventConfig; onDone: () => void }) {
@@ -89,7 +90,7 @@ export function EditRegistration({ slug, code, config, onDone }: { slug: string;
         <fieldset key={s.id}>
           <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{s.title}</legend>
           <div className="grid gap-3">
-            {s.fields.map((f) => <FieldInput key={f.id} field={f} name={`edit-${f.id}`} value={data.answers[f.id]} error={errors[f.id]} onChange={(v) => setAns(f.id, v)} />)}
+            {s.fields.filter((f) => shownIds(config, data.answers).has(f.id)).map((f) => <FieldInput key={f.id} field={f} name={`edit-${f.id}`} value={data.answers[f.id]} error={errors[f.id]} onChange={(v) => setAns(f.id, v)} />)}
           </div>
         </fieldset>
       ))}
@@ -101,7 +102,7 @@ export function EditRegistration({ slug, code, config, onDone }: { slug: string;
               <div key={i} className="rounded-lg border border-slate-200 p-3">
                 <p className="mb-2 text-sm font-bold">{item.label} #{n}</p>
                 <div className="grid gap-3">
-                  {config.attendees.fields.map((f) => (
+                  {config.attendees.fields.filter((f) => isShown(config, f, visibleAnswers(config, data.answers))).map((f) => (
                     <FieldInput key={f.id} field={f} name={`edit-att-${i}-${f.id}`} value={data.attendees[i]?.answers[f.id]} error={errors[`att:${i}:${f.id}`]} onChange={(v) => setAtt(i, f.id, v)} />
                   ))}
                 </div>

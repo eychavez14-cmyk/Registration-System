@@ -10,13 +10,18 @@ export type Field = {
   options?: string[]; // select / radio
   half?: boolean; // half-width on desktop
   description?: string; // small help text under the question
+  showIf?: Condition; // only shown (and only required) when an earlier dropdown/multiple-choice answer matches
 };
+
+// "This answer is one of these options"; points at a main-form dropdown/multiple-choice question.
+export type Condition = { fieldId: string; values: string[] };
 
 export type Section = { id: string; title: string; description?: string; fields: Field[] };
 
 export type EmailText = { subject: string; heading: string; message: string };
 
-export type FeeItem = { id: string; label: string; price: number; description?: string }; // description: small text under the name on the form
+// description: small text under the name on the form. priceRules: special prices by answer (first match wins).
+export type FeeItem = { id: string; label: string; price: number; description?: string; priceRules?: { when: Condition; price: number }[] };
 
 export type EventConfig = {
   header: { subtitle: string; venue: string };
