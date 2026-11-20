@@ -100,7 +100,8 @@ export default function EventEditor() {
 
   return (
     <main className="w-full flex-1 px-4 sm:px-6 py-6">
-      <div className="sticky top-0 z-10 -mx-4 sm:-mx-6 mb-4 flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50/95 px-4 sm:px-6 py-3 backdrop-blur">
+      {/* Pinned on larger screens only: on phones the wrapped tabs would cover a third of the screen. */}
+      <div className="z-10 -mx-4 sm:sticky sm:top-0 sm:-mx-6 mb-4 flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50/95 px-4 sm:px-6 py-3 backdrop-blur">
         <div className="min-w-0">
           <Link href="/admin" className="text-xs text-slate-500 hover:underline">← All events</Link>
           <h1 className="truncate text-xl font-extrabold">{saved.title}</h1>
@@ -112,7 +113,7 @@ export default function EventEditor() {
           {isAdmin && dirty && <button onClick={() => { setDraft(saved); setMsg(""); }} className="text-sm text-slate-500 hover:text-slate-900">Discard</button>}
           {isAdmin && <button onClick={save} disabled={!dirty || busy} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40">{busy ? "Saving…" : dirty ? "Save changes" : "Saved"}</button>}
         </div>
-        <nav className="flex w-full gap-1 overflow-x-auto" aria-label="Event sections">
+        <nav className="flex w-full flex-wrap gap-1" aria-label="Event sections">
           {(Object.keys(TABS) as Tab[]).filter((t) => isAdmin || t === "registrations" || t === "checkin").map((t) => (
             <button key={t} onClick={() => setTab(t)} aria-current={tab === t} className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${tab === t ? "bg-white shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"}`}>{TABS[t]}</button>
           ))}

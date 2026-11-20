@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { EventRow, Registration, Status } from "@/lib/types";
+import type { Answers, EventConfig, EventRow, Registration, Status } from "@/lib/types";
 import { authFetch, browserDb } from "@/lib/supabase/browser";
 import { diffChange } from "@/lib/edit";
-import { money } from "@/lib/validate";
+import { attendeeSlots, money, validateSubmission } from "@/lib/validate";
+import { isShown, shownIds, visibleAnswers } from "@/lib/rules";
+import { FieldInput } from "@/components/RegistrationForm";
 import { STATUS_STYLE } from "@/components/StatusLookup";
 import { registrantEmail } from "@/lib/email";
 import { useRole } from "./AdminGate";
@@ -99,9 +101,9 @@ export function Registrations({ event }: { event: EventRow }) {
           ["Expected", money(cur, stats.expected)],
           ["Confirmed paid", money(cur, stats.confirmed)],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div key={label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-1 text-xl font-extrabold">{value}</p>
+            <p className="mt-1 break-words text-lg font-extrabold sm:text-xl">{value}</p>
           </div>
         ))}
       </div>
@@ -111,7 +113,7 @@ export function Registrations({ event }: { event: EventRow }) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, church, code…" aria-label="Search registrations" className={`${input} max-w-xs`} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, church, code…" aria-label="Search registrations" className={`${input} min-w-0 flex-1 basis-48 sm:max-w-xs`} />
         <select value={status} onChange={(e) => setStatus(e.target.value as Status | "edit" | "")} aria-label="Filter by status" className={`${input} max-w-44`}>
           <option value="">All statuses</option>
           <option value="pending">Pending</option>
@@ -123,7 +125,29 @@ export function Registrations({ event }: { event: EventRow }) {
         <Link href={`/admin/events/${event.id}/report`} className="ml-auto rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-blue-700">📊 Create report</Link>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+      {/* Phones and tablets: one card per registration (no sideways scrolling). */}
+      <ul className="space-y-2 lg:hidden">
+        {filtered.map((r) => (
+          <li key={r.id}>
+            <button type="button" onClick={() => setOpen(r)} className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-left text-sm hover:bg-slate-50">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-mono font-bold">{r.ref_code}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${STATUS_STYLE[r.status]}`}>{r.status}</span>
+                {r.pending_change && <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-800">✏️ edit</span>}
+                <span className="ml-auto font-semibold">{money(cur, Number(r.total))}</span>
+              </div>
+              <p className="mt-1 break-words font-medium">{registrantName(config, r.answers)}</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {new Date(r.created_at).toLocaleString()} · {r.receipt_path ? "📎 Receipt" : "No receipt"}
+                {checkinCount(r) > 0 && <span className="font-semibold text-green-700"> · ✓ Checked in {checkinText(r)}</span>}
+              </p>
+            </button>
+          </li>
+        ))}
+        {!filtered.length && <li className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">No registrations{rows.length ? " match" : " yet"}.</li>}
+      </ul>
+
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white lg:block">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr><th className="p-3">Submitted</th><th className="p-3">Reference</th><th className="p-3">Name</th><th className="p-3 text-right">Total</th><th className="p-3">Receipt</th><th className="p-3">Check-in</th><th className="p-3">Status</th></tr>
@@ -169,6 +193,7 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [editing, setEditing] = useState(false);
   const { config } = event;
   const isAdmin = useRole() === "admin";
   const [emailIt, setEmailIt] = useState(config.emails.enabled && !!registrantEmail(config, reg.answers));
@@ -233,14 +258,21 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
       <div className="max-h-[85vh] overflow-y-auto px-5 pb-5 sm:px-6 sm:pb-6">
         {/* Pinned while scrolling so Close is always reachable */}
         <div className="sticky top-0 z-10 -mx-5 mb-1 border-b border-slate-200 bg-white/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-          <div className="flex items-center gap-3">
-            <h2 className="font-mono text-xl font-bold">{reg.ref_code}</h2>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${STATUS_STYLE[reg.status]}`}>{reg.status}</span>
-            <button onClick={() => ref.current?.close()} aria-label="Close" className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-900">×</button>
+          <div className="flex items-center gap-2">
+            <h2 className="min-w-0 truncate font-mono text-lg font-bold sm:text-xl">{reg.ref_code}</h2>
+            {isAdmin && !editing && <button type="button" onClick={() => { setEditing(true); setInfo(""); }} className={`${btn} ml-auto shrink-0`}>✏️ Edit</button>}
+            <button onClick={() => ref.current?.close()} aria-label="Close" className={`${isAdmin && !editing ? "" : "ml-auto"} flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-900`}>×</button>
           </div>
-          <p className="text-xs text-slate-500">{new Date(reg.created_at).toLocaleString()}</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span className={`rounded-full px-2 py-0.5 font-bold uppercase ${STATUS_STYLE[reg.status]}`}>{reg.status}</span>
+            {new Date(reg.created_at).toLocaleString()}
+          </p>
         </div>
 
+        {editing ? (
+          <AdminEdit reg={reg} config={config} onCancel={() => setEditing(false)} onSaved={(r) => { onSaved(r); setEditing(false); setInfo("Changes saved."); ref.current?.firstElementChild?.scrollTo({ top: 0 }); }} />
+        ) : (<>
+        {info && <p role="status" className="mt-3 rounded-lg bg-green-50 p-2 text-sm text-green-800">{info}</p>}
         {config.sections.map((s) => (
           <div key={s.id} className="mt-4">
             <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{s.title}</h3>
@@ -362,16 +394,121 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
           {registrantEmail(config, reg.answers) ? `Email the registrant (${registrantEmail(config, reg.answers)}) when I confirm or reject` : "No email address on this registration"}
         </label>
         {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
-        {info && <p role="status" className="mt-2 text-sm text-green-700">{info}</p>}
         <div className="mt-4 flex flex-wrap gap-2">
-          <button disabled={busy} onClick={() => save({ status: "confirmed", admin_note: note || null })} className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50">Confirm</button>
-          <button disabled={busy} onClick={() => save({ status: "rejected", admin_note: note || null })} className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50">Reject</button>
-          <button disabled={busy} onClick={() => save({ status: "pending", admin_note: note || null })} className={btn}>Mark pending</button>
+          {/* The current status's button is greyed out so it can't be sent (or emailed) twice. */}
+          <button disabled={busy || reg.status === "confirmed"} onClick={() => save({ status: "confirmed", admin_note: note || null })} className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{reg.status === "confirmed" ? "✓ Confirmed" : "Confirm"}</button>
+          <button disabled={busy || reg.status === "rejected"} onClick={() => save({ status: "rejected", admin_note: note || null })} className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{reg.status === "rejected" ? "✓ Rejected" : "Reject"}</button>
+          <button disabled={busy || reg.status === "pending"} onClick={() => save({ status: "pending", admin_note: note || null })} className={`${btn} disabled:cursor-not-allowed disabled:opacity-40`}>{reg.status === "pending" ? "✓ Pending" : "Mark pending"}</button>
           <button disabled={busy} onClick={() => save({ admin_note: note || null })} className={btn}>Save note</button>
           {isAdmin && <div className="ml-auto"><ConfirmButton label="Delete" question={`Permanently delete ${reg.ref_code} and its receipt? This cannot be undone.`} onConfirm={remove} /></div>}
         </div>
+        </>)}
         <button type="button" onClick={() => ref.current?.close()} className={`${btn} mt-4 w-full`}>Close</button>
       </div>
     </dialog>
+  );
+}
+
+// Admin-only: change a registration's answers, delegates, quantities and amount. The server re-validates everything.
+function AdminEdit({ reg, config, onSaved, onCancel }: { reg: Registration; config: EventConfig; onSaved: (r: Registration) => void; onCancel: () => void }) {
+  const cur = config.fees.currency;
+  const [answers, setAnswers] = useState<Answers>(reg.answers);
+  const [qty, setQty] = useState<Record<string, number>>(reg.fees ?? {});
+  // Delegate details keyed "itemId:n" like the registration form, so changing one quantity keeps everyone else's details.
+  const [att, setAtt] = useState<Record<string, Answers>>(() => {
+    const seen: Record<string, number> = {};
+    return Object.fromEntries((reg.attendees ?? []).map((a) => [`${a.item}:${(seen[a.item] = (seen[a.item] ?? 0) + 1)}`, a.answers]));
+  });
+  // null = follow the prices; a string = an amount the admin typed (discount, partial payment...).
+  const [amount, setAmount] = useState<string | null>(() => (validateSubmission(config, reg.answers, reg.fees).total === Number(reg.total) ? null : String(reg.total)));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const slots = attendeeSlots(config, qty);
+  const attendees = slots.map((s) => att[`${s.item.id}:${s.n}`] ?? {});
+  const v = validateSubmission(config, answers, qty, attendees);
+  const shown = shownIds(config, answers);
+  const vis = visibleAnswers(config, answers);
+
+  async function submit() {
+    setErrors(v.errors);
+    if (Object.keys(v.errors).length) return setError("Please fix the highlighted fields.");
+    if (amount !== null && !(Number(amount) >= 0)) return setError("Amount must be 0 or more.");
+    setBusy(true);
+    setError("");
+    const res = await authFetch("/api/change", { method: "POST", body: JSON.stringify({ registrationId: reg.id, action: "set", answers, fees: qty, attendees, total: amount === null ? null : Number(amount) }) }).catch(() => null);
+    const out = res ? await res.json() : { error: "Network error" };
+    setBusy(false);
+    if (!res?.ok) { setErrors(out.errors ?? {}); return setError(out.error); }
+    onSaved(out.registration as Registration);
+  }
+
+  const heading = "text-xs font-bold uppercase tracking-wide text-slate-500";
+  return (
+    <div className="mt-4 space-y-5">
+      {config.sections.map((s) => (
+        <fieldset key={s.id}>
+          <legend className={`${heading} mb-2`}>{s.title}</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {s.fields.filter((f) => shown.has(f.id)).map((f) => (
+              <FieldInput key={f.id} field={f} name={`admin-${f.id}`} value={answers[f.id]} error={errors[f.id]} onChange={(val) => setAnswers((a) => ({ ...a, [f.id]: val }))} />
+            ))}
+          </div>
+        </fieldset>
+      ))}
+
+      <fieldset>
+        <legend className={`${heading} mb-2`}>Items</legend>
+        <div className="space-y-2">
+          {config.fees.items.map((i) => (
+            <label key={i.id} className="flex items-center gap-3 text-sm">
+              <span className="min-w-0 flex-1">{i.label}</span>
+              <span className="w-20 shrink-0">
+                <input type="number" min={0} inputMode="numeric" value={qty[i.id] ?? 0} aria-label={`${i.label} quantity`}
+                  onChange={(e) => setQty((q) => ({ ...q, [i.id]: Math.max(0, Math.floor(Number(e.target.value)) || 0) }))} className={`${input} text-center`} />
+              </span>
+            </label>
+          ))}
+          {errors.fees && <p className="text-xs text-red-600">{errors.fees}</p>}
+        </div>
+        <label className="mt-3 block w-40 text-sm">
+          <span className="mb-1 block font-medium">Amount ({cur})</span>
+          <input type="number" min={0} step="0.01" inputMode="decimal" value={amount ?? v.total} onChange={(e) => setAmount(e.target.value)} className={`${input} w-40`} />
+        </label>
+        <p className="mt-1 text-xs text-slate-500">
+          Prices add up to {money(cur, v.total)}.{" "}
+          {amount === null ? "The amount follows the prices." : <button type="button" onClick={() => setAmount(null)} className="font-semibold text-blue-600 underline">Use {money(cur, v.total)}</button>}
+        </p>
+      </fieldset>
+
+      {slots.length > 0 && (
+        <fieldset>
+          <legend className={`${heading} mb-2`}>{config.attendees.title}</legend>
+          <div className="space-y-3">
+            {slots.map(({ item, n }, i) => {
+              const key = `${item.id}:${n}`;
+              return (
+                <div key={key} className="rounded-lg border border-slate-200 p-3">
+                  <p className="mb-2 text-sm font-bold">{item.label} #{n}</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {config.attendees.fields.filter((f) => isShown(config, f, vis)).map((f) => (
+                      <FieldInput key={f.id} field={f} name={`admin-att-${i}-${f.id}`} value={att[key]?.[f.id]} error={errors[`att:${i}:${f.id}`]}
+                        onChange={(val) => setAtt((a) => ({ ...a, [key]: { ...a[key], [f.id]: val } }))} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
+
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <button type="button" disabled={busy} onClick={submit} className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">{busy ? "Saving…" : "Save changes"}</button>
+        <button type="button" disabled={busy} onClick={onCancel} className={btn}>Cancel</button>
+      </div>
+    </div>
   );
 }
