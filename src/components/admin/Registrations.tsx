@@ -11,7 +11,7 @@ import { STATUS_STYLE } from "@/components/StatusLookup";
 import { registrantEmail } from "@/lib/email";
 import { useRole } from "./AdminGate";
 import Link from "next/link";
-import { buildLines, choiceFields, choiceKey, filterLines, groupLines, registrantName, sumAmount } from "@/lib/report";
+import { buildLines, choiceFields, choiceKey, filterLines, groupLines, payBreakdown, registrantName, sumAmount } from "@/lib/report";
 import { btn, ConfirmButton, input } from "./ui";
 
 const PAGE = 1000; // Supabase returns at most 1000 rows per request
@@ -65,6 +65,7 @@ export function Registrations({ event }: { event: EventRow }) {
       expected: sumAmount(active),
       confirmed: sumAmount(lines, "confirmed"),
       groups: groupLines(active, config, "category"),
+      pay: payBreakdown(config, active),
       edits: (rows ?? []).filter((r) => r.pending_change).length,
     };
   }, [lines, config, rows]);
@@ -107,6 +108,23 @@ export function Registrations({ event }: { event: EventRow }) {
           </div>
         ))}
       </div>
+      {/* Only when someone registered free or discounted; otherwise everyone paid in full and this adds nothing. */}
+      {(stats.pay.free.people > 0 || stats.pay.discounted.people > 0) && (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          {([
+            ["Paid in full", stats.pay.paid, "border-green-200 bg-green-50 text-green-900"],
+            ["Discounted", stats.pay.discounted, "border-amber-200 bg-amber-50 text-amber-900"],
+            ["Free", stats.pay.free, "border-sky-200 bg-sky-50 text-sky-900"],
+          ] as const).filter(([label, k]) => label === "Paid in full" || k.people > 0).map(([label, k, style]) => (
+            <div key={label} className={`min-w-0 rounded-2xl border p-3 sm:p-4 ${style}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
+              <p className="mt-1 text-lg font-extrabold sm:text-xl">{k.people} {k.people === 1 ? "person" : "people"}</p>
+              {label !== "Free" && <p className="break-words text-sm font-medium opacity-80">{money(cur, k.amount)}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 text-sm">
         {stats.groups.map((g) => <span key={g.name} className="rounded-full border border-slate-200 bg-white px-3 py-1">{g.name}: <b>{g.people}</b> · {money(cur, g.amount)}</span>)}
         {stats.edits > 0 && <button type="button" onClick={() => setStatus("edit")} className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1 font-semibold text-purple-800">✏️ {stats.edits} edit request{stats.edits > 1 ? "s" : ""} waiting</button>}

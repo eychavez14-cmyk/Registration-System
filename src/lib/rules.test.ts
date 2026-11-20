@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { priceOf, visibleAnswers } from "./rules.ts";
 import { validateSubmission } from "./validate.ts";
 import { defaultConfig } from "./defaults.ts";
-import { buildLines } from "./report.ts";
+import { buildLines, payBreakdown } from "./report.ts";
 import type { EventConfig, Registration } from "./types.ts";
 
 // Section 1 ministers are free; Section 3 ministers get a discount; non-ministers always pay.
@@ -47,6 +47,25 @@ test("report gives a free delegate ₱0 and the paying one the whole amount", ()
   const v = validateSubmission(c, { ...base, section: "Section 1" }, { min: 1, non: 1 }, people);
   const reg = { id: "R", ref_code: "REG-X", status: "pending", answers: v.answers, fees: v.fees, attendees: v.attendees, total: v.total } as unknown as Registration;
   assert.deepEqual(buildLines(c, [reg]).map((l) => [l.category, l.amount]), [["Minister", 0], ["Non-Minister", 4000]]);
+});
+
+test("dashboard splits people into paid, discounted and free", () => {
+  const c = cfg();
+  const reg = (id: string, section: string, fees: Record<string, number>, total?: number) => {
+    const v = validateSubmission(c, { ...base, section }, fees, people);
+    return { id, ref_code: id, status: "pending", answers: v.answers, fees: v.fees, attendees: v.attendees, total: total ?? v.total } as unknown as Registration;
+  };
+  const lines = buildLines(c, [
+    reg("A", "Section 1", { min: 1, non: 1 }), // free minister + paying non-minister
+    reg("B", "Section 3", { min: 1 }), // special price 1500 < 2000
+    reg("C", "Section 2", { min: 1 }, 500), // admin typed a lower amount
+    reg("D", "Section 2", { min: 1 }),
+  ]);
+  assert.deepEqual(payBreakdown(c, lines), {
+    paid: { people: 2, amount: 6000 },
+    discounted: { people: 2, amount: 2000 },
+    free: { people: 1, amount: 0 },
+  });
 });
 
 test("hidden questions are not required and their answers are dropped, including chained ones", () => {

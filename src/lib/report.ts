@@ -78,5 +78,23 @@ export function groupLines(lines: Line[], config: EventConfig, groupBy: string):
     }));
 }
 
+// Per person: free (₱0), discounted (paid less than the category's regular price, from a special price or an
+// amount typed by an admin) or paid in full.
+export type PayKind = "paid" | "discounted" | "free";
+export function payKind(config: EventConfig, l: Line): PayKind {
+  if (l.amount <= 0) return "free";
+  const regular = (config.fees.items.find((i) => i.id === l.categoryId)?.price ?? 0) * l.qty;
+  return l.amount < regular - 0.01 ? "discounted" : "paid"; // 0.01: amounts are rounded to centavos when split
+}
+export function payBreakdown(config: EventConfig, lines: Line[]) {
+  const out = { paid: { people: 0, amount: 0 }, discounted: { people: 0, amount: 0 }, free: { people: 0, amount: 0 } };
+  for (const l of lines) {
+    const k = out[payKind(config, l)];
+    k.people += l.qty;
+    k.amount = Math.round((k.amount + l.amount) * 100) / 100;
+  }
+  return out;
+}
+
 export const sumAmount = (lines: Line[], status?: Status) =>
   Math.round(lines.filter((l) => !status || l.reg.status === status).reduce((s, l) => s + l.amount, 0) * 100) / 100;
