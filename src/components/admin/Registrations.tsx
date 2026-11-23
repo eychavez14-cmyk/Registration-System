@@ -11,7 +11,8 @@ import { STATUS_STYLE } from "@/components/StatusLookup";
 import { registrantEmail } from "@/lib/email";
 import { useRole } from "./AdminGate";
 import Link from "next/link";
-import { buildLines, choiceFields, choiceKey, filterLines, groupLines, payBreakdown, registrantName, sumAmount } from "@/lib/report";
+import { buildLines, choiceFields, choiceKey, filterLines, registrantName } from "@/lib/report";
+import { Analytics } from "./Analytics";
 import { btn, ConfirmButton, input } from "./ui";
 
 const PAGE = 1000; // Supabase returns at most 1000 rows per request
@@ -56,19 +57,7 @@ export function Registrations({ event }: { event: EventRow }) {
     return (rows ?? []).filter((r) => ids.has(r.id) && (!status || (status === "edit" ? !!r.pending_change : r.status === status)) && (!needle || text(r).includes(needle)));
   }, [rows, lines, q, status]);
 
-  const stats = useMemo(() => {
-    const regs = new Map(lines.map((l) => [l.reg.id, l.reg]));
-    const active = lines.filter((l) => l.reg.status !== "rejected");
-    return {
-      count: regs.size,
-      by: (s: Status) => [...regs.values()].filter((r) => r.status === s).length,
-      expected: sumAmount(active),
-      confirmed: sumAmount(lines, "confirmed"),
-      groups: groupLines(active, config, "category"),
-      pay: payBreakdown(config, active),
-      edits: (rows ?? []).filter((r) => r.pending_change).length,
-    };
-  }, [lines, config, rows]);
+  const edits = (rows ?? []).filter((r) => r.pending_change).length;
 
   const cur = config.fees.currency;
   const filtering = Object.values(filters).some(Boolean);
@@ -93,42 +82,13 @@ export function Registrations({ event }: { event: EventRow }) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {[
-          ["Registrations", stats.count],
-          ["Pending", stats.by("pending")],
-          ["Confirmed", stats.by("confirmed")],
-          ["Rejected", stats.by("rejected")],
-          ["Expected", money(cur, stats.expected)],
-          ["Confirmed paid", money(cur, stats.confirmed)],
-        ].map(([label, value]) => (
-          <div key={label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-1 break-words text-lg font-extrabold sm:text-xl">{value}</p>
-          </div>
-        ))}
-      </div>
-      {/* Only when someone registered free or discounted; otherwise everyone paid in full and this adds nothing. */}
-      {(stats.pay.free.people > 0 || stats.pay.discounted.people > 0) && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {([
-            ["Paid in full", stats.pay.paid, "border-green-200 bg-green-50 text-green-900"],
-            ["Discounted", stats.pay.discounted, "border-amber-200 bg-amber-50 text-amber-900"],
-            ["Free", stats.pay.free, "border-sky-200 bg-sky-50 text-sky-900"],
-          ] as const).filter(([label, k]) => label === "Paid in full" || k.people > 0).map(([label, k, style]) => (
-            <div key={label} className={`min-w-0 rounded-2xl border p-3 sm:p-4 ${style}`}>
-              <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
-              <p className="mt-1 text-lg font-extrabold sm:text-xl">{k.people} {k.people === 1 ? "person" : "people"}</p>
-              {label !== "Free" && <p className="break-words text-sm font-medium opacity-80">{money(cur, k.amount)}</p>}
-            </div>
-          ))}
-        </div>
-      )}
+      <Analytics config={config} lines={lines} />
 
-      <div className="flex flex-wrap gap-2 text-sm">
-        {stats.groups.map((g) => <span key={g.name} className="rounded-full border border-slate-200 bg-white px-3 py-1">{g.name}: <b>{g.people}</b> · {money(cur, g.amount)}</span>)}
-        {stats.edits > 0 && <button type="button" onClick={() => setStatus("edit")} className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1 font-semibold text-purple-800">✏️ {stats.edits} edit request{stats.edits > 1 ? "s" : ""} waiting</button>}
+      <div className="border-t border-slate-200 pt-5">
+        <h2 className="text-lg font-bold">Registrations</h2>
+        <p className="text-xs text-slate-500">Search and the status filter change this list only; the numbers above follow the dashboard filters.</p>
       </div>
+      {edits > 0 && <button type="button" onClick={() => setStatus("edit")} className="self-start rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-sm font-semibold text-purple-800">✏️ {edits} edit request{edits > 1 ? "s" : ""} waiting</button>}
 
       <div className="flex flex-wrap gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, church, code…" aria-label="Search registrations" className={`${input} min-w-0 flex-1 basis-48 sm:max-w-xs`} />

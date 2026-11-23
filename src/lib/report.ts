@@ -96,5 +96,45 @@ export function payBreakdown(config: EventConfig, lines: Line[]) {
   return out;
 }
 
+// People / registrations / amount for each status. People = delegates (or ticket count when there are no delegate details).
+export function statusTotals(lines: Line[]) {
+  const total = (ls: Line[]) => ({
+    people: ls.reduce((s, l) => s + l.qty, 0),
+    registrations: new Set(ls.map((l) => l.reg.id)).size,
+    amount: sumAmount(ls),
+  });
+  return {
+    pending: total(lines.filter((l) => l.reg.status === "pending")),
+    confirmed: total(lines.filter((l) => l.reg.status === "confirmed")),
+    rejected: total(lines.filter((l) => l.reg.status === "rejected")),
+  };
+}
+
+export const isCheckedIn = (l: Line) => !!l.reg.checkin?.[l.key];
+
+// New registrations and people per day (or per week once the sign-up period runs past 60 days), oldest first,
+// with empty days filled in so gaps show. day = local date "YYYY-MM-DD" of the bucket's first day.
+export function overTime(lines: Line[]) {
+  const dayOf = (iso: string) => { const d = new Date(iso); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+  const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const dated = lines.filter((l) => l.reg.created_at);
+  if (!dated.length) return { unit: "day" as const, buckets: [] };
+  const days = dated.map((l) => dayOf(l.reg.created_at).getTime());
+  const first = Math.min(...days), last = Math.max(...days);
+  const DAY = 86_400_000;
+  const unit = (last - first) / DAY > 60 ? ("week" as const) : ("day" as const);
+  const start = (t: number) => (unit === "day" ? t : t - ((new Date(t).getDay() + 6) % 7) * DAY); // weeks start Monday
+  const buckets = new Map<string, { day: string; people: number; registrations: Set<string> }>();
+  // Step by date (not by 24h) so daylight-saving days don't skip or repeat.
+  for (let d = new Date(start(first)); d.getTime() <= last; d.setDate(d.getDate() + (unit === "day" ? 1 : 7)))
+    buckets.set(key(d), { day: key(d), people: 0, registrations: new Set() });
+  for (const l of dated) {
+    const b = buckets.get(key(new Date(start(dayOf(l.reg.created_at).getTime()))))!;
+    b.people += l.qty;
+    b.registrations.add(l.reg.id);
+  }
+  return { unit, buckets: [...buckets.values()].map((b) => ({ day: b.day, people: b.people, registrations: b.registrations.size })) };
+}
+
 export const sumAmount = (lines: Line[], status?: Status) =>
   Math.round(lines.filter((l) => !status || l.reg.status === status).reduce((s, l) => s + l.amount, 0) * 100) / 100;
