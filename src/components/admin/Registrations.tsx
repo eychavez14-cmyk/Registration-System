@@ -176,6 +176,7 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
   const isAdmin = useRole() === "admin";
   const [emailIt, setEmailIt] = useState(config.emails.enabled && !!registrantEmail(config, reg.answers));
   const known = new Set(config.sections.flatMap((s) => s.fields.map((f) => f.id)));
+  const seen = shownIds(config, reg.answers); // questions this registrant was shown
 
   useEffect(() => {
     ref.current?.showModal();
@@ -255,7 +256,7 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
           <div key={s.id} className="mt-4">
             <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{s.title}</h3>
             <dl className="mt-1 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-              {s.fields.map((f) => <div key={f.id}><dt className="text-slate-500">{f.label}</dt><dd className="font-medium break-words">{display(reg.answers[f.id])}</dd></div>)}
+              {s.fields.filter((f) => seen.has(f.id) || reg.answers[f.id] != null).map((f) => <div key={f.id}><dt className="text-slate-500">{f.label}</dt><dd className="font-medium break-words">{display(reg.answers[f.id])}</dd></div>)}
             </dl>
           </div>
         ))}
@@ -289,7 +290,7 @@ function Detail({ reg, event, onClose, onSaved }: { reg: Registration; event: Ev
                   <li key={i} className="rounded-lg bg-slate-50 p-2">
                     <p className="text-xs font-semibold text-slate-500">{i + 1}. {item?.label ?? "Removed category"}</p>
                     <dl className="grid gap-x-4 sm:grid-cols-2">
-                      {config.attendees.fields.map((f) => <div key={f.id}><dt className="text-slate-500">{f.label}</dt><dd className="font-medium break-words">{display(a.answers[f.id])}</dd></div>)}
+                      {config.attendees.fields.filter((f) => isShown(config, f, reg.answers) || a.answers[f.id] != null).map((f) => <div key={f.id}><dt className="text-slate-500">{f.label}</dt><dd className="font-medium break-words">{display(a.answers[f.id])}</dd></div>)}
                       {rest.map(([k, v]) => <div key={k}><dt className="text-slate-500">{k}</dt><dd className="break-words">{display(v)}</dd></div>)}
                     </dl>
                   </li>

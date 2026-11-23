@@ -47,9 +47,9 @@ export function StatusLookup({ slug, currency, initialCode, config }: { slug: st
   return (
     <div className="mx-auto max-w-lg">
       <Card title="Check Registration Status">
+        <label htmlFor="code" className="mb-2 block text-sm text-slate-600">Paste your registration number</label>
         <form onSubmit={(e) => { e.preventDefault(); search(); }} className="flex gap-2">
-          <label htmlFor="code" className="sr-only">Registration number</label>
-          <input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Paste your registration number, e.g. REG-AB12CD" className={`${inputClass} font-mono uppercase`} />
+          <input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. REG-AB12CD" className={`${inputClass} font-mono uppercase placeholder:normal-case`} />
           <button disabled={busy} className="rounded-lg bg-[var(--primary)] px-4 text-sm font-bold text-white disabled:opacity-60">{busy ? "…" : "Search"}</button>
         </form>
         {error && <p role="alert" className="mt-4 text-sm text-red-600">{error}</p>}

@@ -73,6 +73,7 @@ export const defaultConfig = (): EventConfig => ({
       subject: "Registration received – {event} ({ref})",
       heading: "Registration received",
       message: "Hi {name}, thank you for registering! We have received your registration and will verify your payment soon. Keep your registration number to check your status.",
+      freeMessage: "Hi {name}, thank you for registering! We have received your registration. No payment is needed; we'll confirm it soon. Keep your registration number to check your status.",
     },
     confirmed: {
       subject: "Registration confirmed – {event} ({ref})",
@@ -88,6 +89,11 @@ export const defaultConfig = (): EventConfig => ({
   successMessage: "Thank you for registering! Your registration has been received.",
   successNextSteps: [
     "We'll review your payment and confirm your registration within 24–48 hours. You'll receive an email as soon as it's approved.",
+    "Can't find our email? Please check your Spam or Promotions folder.",
+    "You can also check your status anytime: copy your registration number above and paste it on the Registration Status page.",
+  ].join("\n"),
+  successNextStepsFree: [
+    "No payment is needed. We'll review and confirm your registration within 24–48 hours. You'll receive an email as soon as it's approved.",
     "Can't find our email? Please check your Spam or Promotions folder.",
     "You can also check your status anytime: copy your registration number above and paste it on the Registration Status page.",
   ].join("\n"),

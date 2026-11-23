@@ -91,7 +91,7 @@ export default function ReportPage() {
   );
 
   return (
-    <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[320px_1fr] print:block print:p-0">
+    <main className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[320px_minmax(0,1fr)] print:block print:p-0">
       {/* Settings: never printed */}
       <aside className="space-y-4 print:hidden">
         <Link href={`/admin/events/${id}`} className="text-xs text-slate-500 hover:underline">← Back to dashboard</Link>
@@ -159,7 +159,7 @@ export default function ReportPage() {
 
         <section className="mt-5 break-inside-avoid">
           <h2 className="mb-2 text-base font-bold">Summary by {groupLabel.toLowerCase()}</h2>
-          <table className="w-full border-collapse">
+          <div className="overflow-x-auto print:overflow-visible"><table className="w-full border-collapse">
             <thead><tr className="border-b-2 border-slate-300 text-left text-xs uppercase tracking-wide text-slate-500">
               <th className="py-2 pr-2">{groupLabel}</th><th className="px-2 py-2 text-right">People</th><th className="px-2 py-2 text-right">Registrations</th><th className="py-2 pl-2 text-right">Amount</th>
             </tr></thead>
@@ -177,7 +177,7 @@ export default function ReportPage() {
               <td className="px-2 py-2 text-right">{new Set(lines.map((l) => l.reg.id)).size}</td>
               <td className="py-2 pl-2 text-right">{money(cur, sumAmount(lines))}</td>
             </tr></tfoot>
-          </table>
+          </table></div>
         </section>
 
         {s.showPeople && groups.map((g) => (

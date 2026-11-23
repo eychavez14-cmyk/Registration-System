@@ -42,7 +42,7 @@ export function EventShell({ event, tab, children, intro }: { event: Pick<EventR
     </>
   ) : null;
   const tabClass = (on: boolean) =>
-    `whitespace-nowrap px-3 sm:px-4 py-3 text-sm font-medium border-b-2 ${on ? "border-[var(--primary)] text-[var(--primary)]" : "border-transparent text-slate-500 hover:text-slate-800"}`;
+    `whitespace-nowrap px-2 sm:px-4 py-3 text-[13px] sm:text-sm font-medium border-b-2 ${on ? "border-[var(--primary)] text-[var(--primary)]" : "border-transparent text-slate-500 hover:text-slate-800"}`;
 
   return (
     <div style={style} className="flex-1 flex flex-col text-slate-800">
@@ -64,7 +64,7 @@ export function EventShell({ event, tab, children, intro }: { event: Pick<EventR
         <div className="mx-auto max-w-6xl px-2 sm:px-6 flex items-center print:hidden">
           <Link href={`/e/${event.slug}`} className={tabClass(tab === "form")}>Registration Form</Link>
           <Link href={`/e/${event.slug}/status`} className={tabClass(tab === "status")}>Registration Status</Link>
-          <Link href="/admin" className="ml-auto whitespace-nowrap px-3 py-3 text-sm text-slate-500 hover:text-slate-800">⚙ Login</Link>
+          <Link href="/admin" className="ml-auto whitespace-nowrap px-2 sm:px-3 py-3 text-[13px] sm:text-sm text-slate-500 hover:text-slate-800">⚙ Login</Link>
         </div>
       </nav>
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 sm:py-8">{children}</main>

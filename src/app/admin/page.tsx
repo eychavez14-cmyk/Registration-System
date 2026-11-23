@@ -61,7 +61,7 @@ export default function AdminHome() {
         <ul className="mt-6 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
           {events.map((e) => (
             <li key={e.id} className="flex flex-wrap items-center gap-3 p-4">
-              <Link href={`/admin/events/${e.id}`} className="min-w-0 flex-1">
+              <Link href={`/admin/events/${e.id}`} className="min-w-0 flex-1 basis-full sm:basis-0">
                 <span className="block font-bold hover:underline">{e.title}</span>
                 <span className="block truncate text-xs text-slate-500">/e/{e.slug}</span>
               </Link>

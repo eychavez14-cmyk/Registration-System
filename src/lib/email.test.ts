@@ -52,3 +52,11 @@ test("subject, number, note and status link per kind", () => {
   assert.equal(rec.text.includes("Note from the organizers"), false); // notes only on confirm/reject
   assert.ok(rec.text.includes("Total: ₱600.00"));
 });
+
+test("free (₱0) registrations get the no-payment received message", () => {
+  const args = { kind: "received" as const, title: "Conf", config: cfg, statusUrl: "#" };
+  assert.ok(buildEmail({ ...args, reg: { ...reg, total: 0 } }).html.includes("No payment is needed"));
+  assert.ok(buildEmail({ ...args, reg }).html.includes("verify your payment"));
+  const blank = { ...cfg, emails: { ...cfg.emails, received: { ...cfg.emails.received, freeMessage: "" } } };
+  assert.ok(buildEmail({ ...args, config: blank, reg: { ...reg, total: 0 } }).html.includes("verify your payment")); // empty = normal message
+});

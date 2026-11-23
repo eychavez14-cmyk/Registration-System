@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import type { Answers, Attendee, EventRow, Field } from "@/lib/types";
 import { attendeeSlots, money, validateSubmission } from "@/lib/validate";
 import { shrinkImage } from "@/lib/shrink";
@@ -15,6 +16,22 @@ type Props = { event: Pick<EventRow, "slug" | "title" | "config" | "is_open">; p
 
 export const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20";
+
+// Messenger/Facebook in-app browsers often block the clipboard API; the old copy command still works there.
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const t = document.createElement("textarea");
+    t.value = text;
+    document.body.appendChild(t);
+    t.select();
+    const ok = document.execCommand("copy");
+    t.remove();
+    return ok;
+  }
+}
 
 export function Card({ title, children }: { title?: string; children: ReactNode }) {
   return (
@@ -92,7 +109,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
   const [qty, setQty] = useState<Record<string, number>>({});
   const [file, setFile] = useState<File | null>(null);
   const [preparing, setPreparing] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [rawErrors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [done, setDone] = useState<Done | null>(sampleDone ?? null);
@@ -108,6 +125,23 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
   const free = count > 0 && total === 0; // nothing to pay: no payment instructions or receipt
   const slots = attendeeSlots(config, qty);
   const needsProof = payment.enabled && payment.requireProof && total > 0;
+  const [copiedAcct, setCopiedAcct] = useState(false);
+  const copyAccount = async () => {
+    if (!(await copyText(payment.accountNumber))) return;
+    setCopiedAcct(true);
+    setTimeout(() => setCopiedAcct(false), 2500);
+  };
+  const FIX = "Please fix the highlighted fields.";
+  const [tried, setTried] = useState(false); // after the first submit, errors update as people fix them
+  const check = () => {
+    const v = validateSubmission(config, answers, qty, slots.map((s) => att[`${s.item.id}:${s.n}`] ?? {}));
+    if (needsProof && !file) v.errors.proof = "Please upload your proof of payment";
+    return v;
+  };
+  // After a submit attempt, an error disappears as soon as its field passes (new errors still wait for the next submit).
+  const live = tried ? check().errors : null;
+  const errors = live ? Object.fromEntries(Object.entries(rawErrors).filter(([k]) => k in live)) : rawErrors;
+  const formMessage = message === FIX && !Object.keys(errors).length ? "" : message;
   const setQ = (id: string, n: number) => setQty((q) => ({ ...q, [id]: Math.max(0, Math.min(500, Math.floor(n) || 0)) }));
   // The QR lives on another domain (Supabase), where a plain download link just opens it, so fetch it as a file first.
   const downloadPaymentQr = async () => {
@@ -147,21 +181,11 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
       }
     };
     const copyNumber = async () => {
-      try {
-        await navigator.clipboard.writeText(done.ref_code);
-      } catch {
-        // Messenger/Facebook in-app browsers often block the clipboard API; the old copy command still works there.
-        const t = document.createElement("textarea");
-        t.value = done.ref_code;
-        document.body.appendChild(t);
-        t.select();
-        const ok = document.execCommand("copy");
-        t.remove();
-        if (!ok) return setCopied("failed");
-      }
+      if (!(await copyText(done.ref_code))) return setCopied("failed");
       setCopied("yes");
       setTimeout(() => setCopied(""), 2500);
     };
+    const nextSteps = (done.total === 0 && config.successNextStepsFree?.trim()) || config.successNextSteps;
     const actionBtn = "flex-1 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-60";
     return (
       <div className="mx-auto max-w-2xl">
@@ -183,11 +207,11 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
             </div>
             {message && <p role="alert" className="mt-2 text-sm text-red-700 print:hidden">{message}</p>}
           </div>
-          {config.successNextSteps.trim() && (
+          {nextSteps.trim() && (
             <div className="mb-6 rounded-xl border border-[var(--primary)]/25 bg-[var(--primary)]/5 p-4">
               <p className="text-sm font-bold text-slate-800">What happens next</p>
               <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
-                {config.successNextSteps.split("\n").filter((l) => l.trim()).map((l, i) => <li key={i}>{l}</li>)}
+                {nextSteps.split("\n").filter((l) => l.trim()).map((l, i) => <li key={i}>{l}</li>)}
               </ul>
               <Link href={statusPath} className="mt-3 inline-block rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-bold text-white hover:brightness-110 print:hidden">🔎 Check registration status</Link>
             </div>
@@ -207,7 +231,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
               </div>
             ))}
           </div>
-          {!config.successNextSteps.trim() && <Link href={statusPath} className="mt-4 inline-block text-sm font-semibold text-[var(--primary)] underline print:hidden">Check registration status</Link>}
+          {!nextSteps.trim() && <Link href={statusPath} className="mt-4 inline-block text-sm font-semibold text-[var(--primary)] underline print:hidden">Check registration status</Link>}
         </Card>
       </div>
     );
@@ -217,13 +241,12 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
     e.preventDefault();
     if (preview) return;
     setMessage("");
+    const v = check();
     const attendees = slots.map((s) => att[`${s.item.id}:${s.n}`] ?? {});
-    const v = validateSubmission(config, answers, qty, attendees);
-    if (needsProof && !file) v.errors.proof = "Please upload your proof of payment";
-    setErrors(v.errors);
+    flushSync(() => { setTried(true); setErrors(v.errors); }); // draw the red fields now, so we can scroll to the first one
     if (Object.keys(v.errors).length) {
-      setMessage("Please fix the highlighted fields.");
-      document.querySelector("[aria-invalid=true], .field-error")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setMessage(FIX);
+      document.querySelector("[aria-invalid=true], .field-error")?.scrollIntoView({ block: "center" });
       return;
     }
     setBusy(true);
@@ -339,9 +362,17 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
               <p className="text-xs font-bold uppercase tracking-wide text-[var(--primary)]">Payment Instructions</p>
               <p className="mt-2 whitespace-pre-line text-slate-600">{payment.instructions}</p>
               {(payment.accountName || payment.accountNumber) && (
-                <dl className="mt-3 space-y-1 rounded-lg bg-white p-3">
-                  <div className="flex justify-between gap-2"><dt className="text-xs text-slate-500">ACCOUNT NAME</dt><dd className="font-mono font-bold">{payment.accountName}</dd></div>
-                  <div className="flex justify-between gap-2"><dt className="text-xs text-slate-500">ACCOUNT NUMBER</dt><dd className="font-mono font-bold text-[var(--primary)]">{payment.accountNumber}</dd></div>
+                <dl className="mt-3 space-y-2 rounded-lg bg-white p-3">
+                  {payment.accountName && <div><dt className="text-[11px] font-semibold tracking-wide text-slate-500">ACCOUNT NAME</dt><dd className="font-mono font-bold break-words">{payment.accountName}</dd></div>}
+                  {payment.accountNumber && (
+                    <div>
+                      <dt className="text-[11px] font-semibold tracking-wide text-slate-500">ACCOUNT NUMBER</dt>
+                      <dd className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-bold text-[var(--primary)] break-all">{payment.accountNumber}</span>
+                        <button type="button" onClick={copyAccount} className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">{copiedAcct ? "✓ Copied" : "Copy"}</button>
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               )}
               {payment.qrUrl && (
@@ -376,7 +407,7 @@ export function RegistrationForm({ event, preview, sampleDone }: Props) {
             </div>
           )}
 
-          {message && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{message}</p>}
+          {formMessage && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{formMessage}</p>}
           <button disabled={busy || preview || preparing} className="mt-5 w-full rounded-xl bg-[var(--primary)] px-4 py-3 font-bold text-white shadow hover:brightness-110 disabled:opacity-60">
             {busy ? "Submitting…" : preview ? "Complete Registration (preview)" : "Complete Registration"}
           </button>

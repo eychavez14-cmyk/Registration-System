@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { EventConfig, EmailText } from "@/lib/types";
 import { buildEmail, fromName, PLACEHOLDERS, type EmailKind } from "@/lib/email";
 import { Panel, Text, Toggle } from "./ui";
@@ -18,7 +18,12 @@ export function EmailEditor({ title, config, onChange }: { title: string; config
   const set = (patch: Partial<EventConfig["emails"]>) => onChange({ ...config, emails: { ...emails, ...patch } });
   const setText = (k: EmailKind, patch: Partial<EmailText>) => set({ [k]: { ...emails[k], ...patch } });
   const emailField = config.sections.flatMap((s) => s.fields).find((f) => f.type === "email");
-  const preview = buildEmail({ kind, title, config, reg: sampleRegistration(config, kind), statusUrl: "#", qrUrl: "/api/qr?slug=sample&code=REG-SAMPLE" });
+  // The sandboxed preview can't load images from our server, so the sample QR is drawn here as a data URL.
+  const [qr, setQr] = useState<string>();
+  useEffect(() => {
+    import("qrcode").then((m) => m.default.toDataURL(`${location.origin}/e/sample/status?code=REG-SAMPLE`, { width: 360, margin: 2 })).then(setQr, () => {});
+  }, []);
+  const preview = buildEmail({ kind, title, config, reg: sampleRegistration(config, kind), statusUrl: "#", qrUrl: qr });
 
   return (
     <div className="grid gap-6 xl:grid-cols-[460px_1fr] items-start">
@@ -45,6 +50,7 @@ export function EmailEditor({ title, config, onChange }: { title: string; config
           <Text label="Subject" value={emails[kind].subject} onChange={(subject) => setText(kind, { subject })} />
           <Text label="Heading" value={emails[kind].heading} onChange={(heading) => setText(kind, { heading })} />
           <Text label="Message" textarea value={emails[kind].message} onChange={(message) => setText(kind, { message })} />
+          {kind === "received" && <Text label="Message for free (₱0) registrations (leave empty to use the message above)" textarea value={emails.received.freeMessage ?? ""} onChange={(freeMessage) => setText("received", { freeMessage })} />}
           <p className="text-xs text-slate-500">
             You can type {PLACEHOLDERS.map((p, i) => <span key={p}>{i > 0 && ", "}<code className="rounded bg-slate-100 px-1">{p}</code></span>)}: they become the event name, registration number, registrant&apos;s name and total.
             {kind !== "received" && " Your note on the registration is added below the message."} The registration details and a status button are always included.
@@ -60,7 +66,7 @@ export function EmailEditor({ title, config, onChange }: { title: string; config
             <div className="flex gap-2"><dt className="w-16 shrink-0 text-slate-500">Subject</dt><dd className="font-semibold break-words">{preview.subject}</dd></div>
           </dl>
           {/* sandbox: preview HTML runs no scripts and can't navigate the admin page */}
-          <iframe title="Email preview" sandbox="" srcDoc={preview.html} className="h-[calc(100vh-16rem)] min-h-96 w-full" />
+          <iframe key={qr ? "qr" : "plain"} title="Email preview" sandbox="" srcDoc={preview.html} className="h-[calc(100vh-16rem)] min-h-96 w-full" />
         </div>
       </div>
     </div>

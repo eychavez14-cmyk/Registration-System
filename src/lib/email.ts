@@ -29,7 +29,7 @@ export function buildEmail({ kind, title, config, reg, statusUrl, qrUrl }: Input
   const name = [a.first_name, a.last_name].filter((x) => typeof x === "string" && x).join(" ") || "there";
   const vars = { event: title, ref: reg.ref_code, name, total: money(config.fees.currency, Number(reg.total)) };
   const tpl = config.emails[kind];
-  const copy = { subject: oneLine(fill(tpl.subject, vars)), heading: fill(tpl.heading, vars), message: fill(tpl.message, vars) };
+  const copy = { subject: oneLine(fill(tpl.subject, vars)), heading: fill(tpl.heading, vars), message: fill((kind === "received" && Number(reg.total) === 0 && tpl.freeMessage?.trim()) || tpl.message, vars) };
   const groups = registrationSummary(config, { ...reg, attendees: reg.attendees ?? [], total: Number(reg.total) });
   const rows = groups
     .map((g) => `<tr><td colspan="2" style="padding:18px 0 6px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:700;letter-spacing:.05em;color:#64748b;text-transform:uppercase">${esc(g.title)}</td></tr>` +

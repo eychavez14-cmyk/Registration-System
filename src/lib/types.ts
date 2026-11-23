@@ -18,7 +18,7 @@ export type Condition = { fieldId: string; values: string[] };
 
 export type Section = { id: string; title: string; description?: string; fields: Field[] };
 
-export type EmailText = { subject: string; heading: string; message: string };
+export type EmailText = { subject: string; heading: string; message: string; freeMessage?: string }; // freeMessage: used instead of message when the total is ₱0 (received email only)
 
 // description: small text under the name on the form. priceRules: special prices by answer (first match wins).
 export type FeeItem = { id: string; label: string; price: number; description?: string; priceRules?: { when: Condition; price: number }[] };
@@ -58,6 +58,7 @@ export type EventConfig = {
   emails: { enabled: boolean; fromName: string; received: EmailText; confirmed: EmailText; rejected: EmailText };
   successMessage: string;
   successNextSteps: string; // "What happens next" box on the success screen
+  successNextStepsFree: string; // same box for ₱0 registrations (empty = use successNextSteps)
   footer: string;
 };
 

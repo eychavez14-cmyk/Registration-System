@@ -58,6 +58,12 @@ export default function EventEditor() {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+  // "Saved ✓" fades after a few seconds, so the phone Save bar goes away too.
+  useEffect(() => {
+    if (!msg.startsWith("Saved")) return;
+    const t = setTimeout(() => setMsg(""), 6000);
+    return () => clearTimeout(t);
+  }, [msg]);
 
   if (!draft || !saved) return <p className="p-10 text-center text-sm text-slate-500">Loading…</p>;
 
@@ -98,8 +104,17 @@ export default function EventEditor() {
   const publicUrl = typeof window !== "undefined" ? `${window.location.origin}/e/${saved.slug}` : "";
   const showPreview = tab === "form" || tab === "fees" || tab === "design";
 
+  const saveControls = (
+    <>
+      {msg && <span role="status" className={`text-sm ${msg.startsWith("Saved") ? "text-green-700" : "text-red-600"}`}>{msg}</span>}
+      {isAdmin && dirty && <button onClick={() => { setDraft(saved); setMsg(""); }} className="ml-auto text-sm text-slate-500 hover:text-slate-900 sm:ml-0">Discard</button>}
+      {isAdmin && <button onClick={save} disabled={!dirty || busy} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40">{busy ? "Saving…" : dirty ? "Save changes" : "Saved"}</button>}
+    </>
+  );
+  const phoneBar = isAdmin && (dirty || busy || !!msg); // on phones Save sits at the bottom, only when there's something to save or report
+
   return (
-    <main className="w-full flex-1 px-4 sm:px-6 py-6">
+    <main className={`w-full flex-1 px-4 sm:px-6 py-6 ${phoneBar ? "pb-24 sm:pb-6" : ""}`}>
       {/* Pinned on larger screens only: on phones the wrapped tabs would cover a third of the screen. */}
       <div className="z-10 -mx-4 sm:sticky sm:top-0 sm:-mx-6 mb-4 flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50/95 px-4 sm:px-6 py-3 backdrop-blur">
         <div className="min-w-0">
@@ -108,17 +123,15 @@ export default function EventEditor() {
         </div>
         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${saved.is_published ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{saved.is_published ? (saved.is_open ? "Live" : "Closed") : "Draft"}</span>
         {saved.is_published && <a href={publicUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">Open form ↗</a>}
-        <div className="ml-auto flex items-center gap-3">
-          {msg && <span role="status" className={`text-sm ${msg.startsWith("Saved") ? "text-green-700" : "text-red-600"}`}>{msg}</span>}
-          {isAdmin && dirty && <button onClick={() => { setDraft(saved); setMsg(""); }} className="text-sm text-slate-500 hover:text-slate-900">Discard</button>}
-          {isAdmin && <button onClick={save} disabled={!dirty || busy} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40">{busy ? "Saving…" : dirty ? "Save changes" : "Saved"}</button>}
-        </div>
+        <div className="ml-auto hidden items-center gap-3 sm:flex">{saveControls}</div>
         <nav className="flex w-full flex-wrap gap-1" aria-label="Event sections">
           {(Object.keys(TABS) as Tab[]).filter((t) => isAdmin || t === "registrations" || t === "checkin").map((t) => (
             <button key={t} onClick={() => setTab(t)} aria-current={tab === t} className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${tab === t ? "bg-white shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"}`}>{TABS[t]}</button>
           ))}
         </nav>
       </div>
+
+      {phoneBar && <div className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur sm:hidden">{saveControls}</div>}
 
       {tab === "registrations" && <Registrations event={saved} />}
       {tab === "checkin" && <CheckIn event={saved} />}

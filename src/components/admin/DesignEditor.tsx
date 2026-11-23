@@ -147,6 +147,7 @@ export function DesignEditor({ eventId, config, onChange }: { eventId: string; c
       <Panel title="Success page (after submitting)">
         <Text label="Thank-you message" textarea value={config.successMessage} onChange={(successMessage) => onChange({ ...config, successMessage })} />
         <Text label='"What happens next" box (one point per line; leave empty to hide)' textarea value={config.successNextSteps} onChange={(successNextSteps) => onChange({ ...config, successNextSteps })} />
+        <Text label='"What happens next" for free (₱0) registrations (leave empty to use the box above)' textarea value={config.successNextStepsFree} onChange={(successNextStepsFree) => onChange({ ...config, successNextStepsFree })} />
         <p className="-mt-2 text-xs text-slate-500">Tip: switch the preview to <b>Success page</b> to see these.</p>
       </Panel>
       <Panel title="Footer">
